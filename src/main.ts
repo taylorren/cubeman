@@ -197,7 +197,8 @@ function backToIdle(): void {
 }
 
 function perform(action: Action): void {
-  if (busy && mode.anim !== prof.sleep) return; // toy ignores presses mid-trick...
+  if (busy && mode.anim !== prof.sleep && mode.anim !== shared.sleepEnter) return;
+  // toy ignores presses mid-trick — but falling asleep or asleep can be interrupted
   if (mode.anim === prof.sleep || mode.anim === shared.sleepEnter) {
     // ...but a press wakes it up: stretch first, then do the action
     busy = true;

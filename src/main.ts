@@ -92,6 +92,9 @@ function startAction(action: Action, spontaneous = false): void {
   mode = { anim: action.anim, loop: false, action, onEnd: backToIdle };
   frame = 0;
   if (!spontaneous) lastInteract = performance.now();
+  // any ACTUAL action consumes the pending spontaneous slot (user-triggered
+  // ones included) — idling/wandering never postpones it
+  nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
   achievements.record(action.id);
 }
 
@@ -109,8 +112,8 @@ function randRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function scheduleSpontaneous(): void {
-  nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
+/** Re-arm ONLY the wander timer — never the spontaneous deadline. */
+function scheduleWander(): void {
   nextWander = performance.now() + randRange(WANDER_MIN_MS, WANDER_MAX_MS);
 }
 
@@ -127,6 +130,7 @@ function startWalkTo(cxTarget: number, next: () => void): void {
 
 /** Stroll to a random spot within the walkable range. */
 function startWander(): void {
+  scheduleWander(); // re-arm even if we end up staying put
   const [lo, hi] = walkableCx();
   const target = lo + Math.random() * (hi - lo);
   if (Math.abs(target - cx()) < 3) return; // too close — stay put
@@ -158,6 +162,7 @@ function travelTo(sceneId: string, next: () => void): void {
 
 /** Wander to a random OTHER room (internal doors only). */
 function exploreRoom(): void {
+  scheduleWander();
   const others = prof.scenes.filter((s) => s.id !== scene().id);
   const target = others[Math.floor(Math.random() * others.length)]!;
   travelTo(target.id, backToIdle);
@@ -165,6 +170,7 @@ function exploreRoom(): void {
 
 /** Amble over to the ball and give it a kick. */
 function playBall(): void {
+  scheduleWander();
   if (scene().id !== 'living') return;
   const [lo] = walkableCx();
   const stand = Math.max(lo + 1, ball.x - 4);
@@ -181,7 +187,8 @@ function backToIdle(): void {
   busy = false;
   mode = { anim: prof.idle, loop: true };
   frame = 0;
-  scheduleSpontaneous();
+  scheduleWander(); // only wandering re-arms here; the spontaneous
+  // deadline set by startAction stays until a real action runs
 }
 
 function perform(action: Action): void {

@@ -125,6 +125,10 @@ one of its own `actions` every 6–14 seconds. Consequences for content:
   reset the sleep timer** (only real user presses do), so an ignored cubeman
   still dozes off after 30s. Tune `SLEEP_AFTER_MS` / `SPONTANEOUS_*_MS` /
   `WANDER_*_MS` in `main.ts`, not the animations.
+- **Timer independence**: the spontaneous deadline survives any amount of
+  wandering/ball-play/room-hopping — only an *actual* action (spontaneous or
+  user-triggered, via `startAction`) reschedules it. Wandering re-arms only
+  its own timer, so walks can never starve tricks.
 - **Wandering**: idle alternates between pausing (breathe/glance) and strolling
   to a random spot via the shared `walk` cycle, moved with `shiftX`. All
   position changes happen at render time — poses are authored at x=0 and never

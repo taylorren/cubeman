@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matchman — Cube World Simulator</title>
+  </head>
+  <body>
+    <div class="scene">
+      <div class="cube" id="cube">
+        <div class="bezel">
+          <canvas id="screen"></canvas>
+        </div>
+        <div class="buttons">
+          <button class="btn" data-action="0" aria-label="Action 1"></button>
+          <button class="btn btn-star" data-action="random" aria-label="Surprise">★</button>
+          <button class="btn" data-action="2" aria-label="Action 3"></button>
+        </div>
+      </div>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

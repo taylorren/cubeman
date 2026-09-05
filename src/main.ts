@@ -1,7 +1,7 @@
 import './style.css';
 import { Loop } from './core/loop';
 import { LCD } from './render/lcd';
-import { sample, shiftX } from './render/skeleton';
+import { animExtent, sample, shiftX } from './render/skeleton';
 import { professions } from './content/professions';
 import * as shared from './content/professions/shared';
 import type { Action } from './content/professions';
@@ -98,6 +98,39 @@ function startAction(action: Action, spontaneous = false): void {
   // ones included) — idling/wandering never postpones it
   nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
   achievements.record(action.id);
+}
+
+// --- Stage discipline: wide actions need room -------------------------------
+
+const extentCache = new Map<string, number>();
+function actionExtent(a: Action): number {
+  let e = extentCache.get(a.id);
+  if (e === undefined) {
+    e = animExtent(a.anim);
+    extentCache.set(a.id, e);
+  }
+  return e;
+}
+
+/** Body-center band within which every frame of the action stays ≥1px
+ *  inside the display: joint reach = 24 + scale·(|x-offset| + extent). */
+function safeBand(a: Action): [number, number] {
+  const half = 23 - LCD.BODY_SCALE * actionExtent(a);
+  return [Math.max(3, 24 - half), Math.min(45, 24 + half)];
+}
+
+/** Run an action, strolling toward center stage first if the current spot
+ *  is too cramped for it. (Room-crossing walks are intentional off-screen
+ *  movement and go through startWalkTo directly — they are exempt.) */
+function runAction(action: Action, spontaneous = false): void {
+  const [lo, hi] = safeBand(action);
+  if (cx() >= lo && cx() <= hi) {
+    startAction(action, spontaneous);
+    return;
+  }
+  const [wlo, whi] = walkableCx();
+  const target = Math.min(whi, Math.max(wlo, Math.min(hi, Math.max(lo, cx()))));
+  startWalkTo(target, () => startAction(action, spontaneous));
 }
 
 // --- Idle life: spontaneous tricks + wandering -------------------------------
@@ -202,10 +235,10 @@ function perform(action: Action): void {
   if (mode.anim === prof.sleep || mode.anim === shared.sleepEnter) {
     // ...but a press wakes it up: stretch first, then do the action
     busy = true;
-    mode = { anim: shared.wake, loop: false, onEnd: () => startAction(action) };
+    mode = { anim: shared.wake, loop: false, onEnd: () => runAction(action) };
     frame = 0;
   } else {
-    startAction(action);
+    runAction(action);
   }
 }
 
@@ -316,7 +349,7 @@ const loop = new Loop(
       performance.now() >= nextSpontaneous
     ) {
       const pool = prof.actions;
-      startAction(pool[Math.floor(Math.random() * pool.length)]!, true);
+      runAction(pool[Math.floor(Math.random() * pool.length)]!, true);
       return;
     }
     // wander / kick the ball / explore another room

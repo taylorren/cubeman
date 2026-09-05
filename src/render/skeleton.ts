@@ -107,3 +107,14 @@ export function sample(anim: Anim, frame: number): Skeleton {
   }
   return last.pose;
 }
+
+/** Largest horizontal deviation of any joint from the pose origin (x=24)
+ *  across an animation's keyframes — how much room the anim needs on each
+ *  side of the body center to stay on screen. (Interpolation between
+ *  keyframes is per-joint linear, so keyframe maxima bound every frame.) */
+export function animExtent(anim: Anim): number {
+  let e = 0;
+  for (const k of anim.keys)
+    for (const j of JOINTS) e = Math.max(e, Math.abs(k.pose[j][0] - 24));
+  return e;
+}

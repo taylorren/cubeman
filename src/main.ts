@@ -19,6 +19,8 @@ const lcd = new LCD(document.getElementById('screen') as HTMLCanvasElement, PX, 
 
 let sceneIdx = 0;
 const scene = () => prof.scenes[sceneIdx]!;
+/** Timestamp of each room's last visit — drives fair room rotation. */
+const roomLastVisited: Record<string, number> = {};
 
 // --- Cubeman state machine (idle <-> action, auto-sleep) --------------------
 
@@ -144,6 +146,7 @@ function crossEdge(dir: 'left' | 'right', next: () => void): void {
   const edge = scene()[dir];
   if (edge.kind !== 'scene') return; // neighbor edges activate in P2
   sceneIdx = prof.scenes.findIndex((s) => s.id === edge.id);
+  roomLastVisited[scene().id] = performance.now();
   // enter from the opposite side and stroll a few steps inward
   x = cxToTarget(dir === 'right' ? 4 : 44);
   startWalkTo(dir === 'right' ? 11 : 37, next);
@@ -163,9 +166,11 @@ function travelTo(sceneId: string, next: () => void): void {
 /** Wander to a random OTHER room (internal doors only). */
 function exploreRoom(): void {
   scheduleWander();
-  const others = prof.scenes.filter((s) => s.id !== scene().id);
-  const target = others[Math.floor(Math.random() * others.length)]!;
-  travelTo(target.id, backToIdle);
+  // prefer the room visited longest ago so all rooms get screen time
+  const others = prof.scenes
+    .filter((s) => s.id !== scene().id)
+    .sort((a, b) => (roomLastVisited[a.id] ?? 0) - (roomLastVisited[b.id] ?? 0));
+  travelTo(others[0]!.id, backToIdle);
 }
 
 /** Amble over to the ball and give it a kick. */

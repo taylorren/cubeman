@@ -251,8 +251,10 @@ function flopAsleep(): void {
   fallAsleep(false);
 }
 
-/** Wake up from a nap (stamina recovered enough). */
+/** Wake up from a nap (stamina recovered enough). Resetting lastInteract
+ *  prevents an immediate boredom-nap loop right after waking. */
 function wakeFromSleep(): void {
+  lastInteract = performance.now();
   busy = true;
   mode = { anim: shared.wake, loop: false, onEnd: backToIdle };
   frame = 0;

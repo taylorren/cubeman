@@ -123,8 +123,11 @@ sleep → wake                when rested: full tank (bed) or partial (flop), th
 sleep/wake → (stretch) → pressed action     any press wakes
 ```
 
-Modes chain via `onEnd` callbacks (`src/main.ts`) — the same machinery that
-will drive walk-to-edge → cross-cube transitions in P2.
+Modes chain via `onEnd` callbacks inside the `Cubeman` runtime
+(`src/game/cubeman.ts`) — the same machinery that drives walk-to-edge →
+cross-cube visits, and `src/game/shelf.ts` resolves where a `neighbor` exit
+leads. Each cubeman runs its own state machine; there is no module-level
+gameplay state.
 
 ## Stamina (hidden energy budget, `src/game/stamina.ts`)
 
@@ -154,7 +157,10 @@ interrupts activity.
   stamina; boring ≠ tired, both lead to naps).
 
 Tune all thresholds/costs in `STAMINA` (one config object). New professions:
-give each action an `effort` that reflects its spectacle.
+give each action an `effort` that reflects its spectacle. **One `Stamina`
+instance per cubeman** — energy budgets are fully independent, even while
+one cubeman visits another's cube (the visitor keeps its own tank, and only
+it sleeps in its own bed). Regeneration happens in the `Cubeman` tick.
 
 **Spontaneity contract**: idle is not static — the cubeman performs a random
 one of its own `actions` every 6–14 seconds. Consequences for content:
@@ -232,3 +238,50 @@ opposite side) — the same handoff P2 uses between cubes.
 4. Register in `index.ts`; wire its unlock into achievements (`game/achievements.ts`).
 5. Check density: nothing important in y 10–40 center band; ground at `GROUND_Y`.
 6. Verify all actions from idle, sleep-entry/wake chaining, and the 60s auto-sleep.
+
+## Two cubes, a shelf, and visiting (current phase)
+
+The toy is now a small ecosystem of independent runtimes — not one big state
+object. The split keeps character state and world state evolving separately:
+
+- **`Cubeman`** (`src/game/cubeman.ts`) — one per character. Owns animation
+  mode, position (`x`), stamina, timers, sleep, and the `home` cube. Its
+  *current* cube is tracked separately from `home`, so visiting never changes
+  ownership. Two `Cubeman` instances (Slick & Pip) each use the Stickman
+  profession for now.
+- **`Cube`** (`src/game/cube.ts`) — one per toy. Owns rooms and props: the
+  ball belongs to the living room and rolls even when the cube is empty. The
+  room on display (`currentSceneId`) belongs to the cube, not any one cubeman.
+- **`Shelf`** (`src/game/shelf.ts`) — the ordered row of slots. Connections
+  between cubes are **derived from slot adjacency** (slot `i` ↔ `i±1`), never
+  from scene-array ordering. `neighborOf(cube, dir)` resolves a `neighbor`
+  exit to a specific cube; when the adjacent slot is empty it's a wall. A
+  cube is home to one resident plus **at most one visitor**.
+- **`Stamina`** (`src/game/stamina.ts`) — per-cubeman energy (see above).
+- **Rendering** (`src/render/lcd.ts`, `src/main.ts`) — `LCD.drawBatch`
+  composites several skeletons over one shared backdrop: a cube's display
+  draws its current room, then **every** cubeman standing in it (resident +
+  visitor, i.e. shared-room occupancy).
+
+**Autonomous visit** — a first-class cubeman behavior (not a button press):
+from the **home living room** (where the `neighbor` exits live) an idle
+cubeman sometimes crosses a *connected* edge into the neighbor's living room
+(`startVisit`). The visit has three guarantees:
+
+1. It only fires from home **and** the living room **and** an actually
+   connected edge — otherwise it's a clean no-op (`startVisit` self-guards;
+   `connectedNeighborDir()` returns null when no neighbor is connected).
+2. It respects capacity — `canAcceptVisitor` allows one resident plus one
+   visitor, checked at departure. **Returning home is always allowed**, so a
+   cubeman never gets stranded even if the neighbor is visiting *its* home at
+   the same time.
+3. It is a round trip — after 20–40s (`VISIT_MIN/MAX_MS`) the visitor routes
+   back through the host's hub (`returnHome`) and crosses home; whether it
+   wandered deeper into the host's rooms or not, `returnHome` first returns to
+   the host's hub, then exits. Returns are callback-safe (no deadlocks).
+   **Return-home-before-sleep is explicit**: a visitor that needs to nap or
+   flop always travels home first, then sleeps in its own bed.
+
+Internal room doors (`scene` edges) still use the scene graph within a cube;
+`neighbor` edges and the shelf handle the cross-cube hop, kept distinct from
+scene ordering.

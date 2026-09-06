@@ -3,7 +3,8 @@
  * ONLY sleep regenerates it. Deliberately invisible on screen: the player
  * reads tiredness through behavior (fewer tricks, shorter strolls, flopping),
  * never through a bar. User presses always perform — stamina only shapes
- * autonomous behavior.
+ * autonomous behavior. ONE INSTANCE PER CUBEMAN: energy budgets are fully
+ * independent, even when one cubeman visits another's cube.
  */
 
 export const STAMINA = {
@@ -37,16 +38,20 @@ export const STAMINA = {
 /** After an accepted press, behavior-recovery (bed/flop) waits this long. */
 export const GRACE_MS = 10_000;
 
-let value: number = STAMINA.MAX;
+export class Stamina {
+  private value: number = STAMINA.MAX;
 
-export const stamina = {
-  get: (): number => value,
+  get(): number {
+    return this.value;
+  }
+
   /** Consume energy, clamped at 0. */
   spend(n: number): void {
-    value = Math.max(0, value - n);
-  },
+    this.value = Math.max(0, this.value - n);
+  }
+
   /** Recover energy (sleep only), clamped at MAX. */
   regen(n: number): void {
-    value = Math.min(STAMINA.MAX, value + n);
-  },
-};
+    this.value = Math.min(STAMINA.MAX, this.value + n);
+  }
+}

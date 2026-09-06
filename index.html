@@ -18,18 +18,29 @@
       <section class="shelf-wrap">
         <div class="shelf" id="shelf">
           <div class="slot" data-slot="0">
-            <div class="cube" id="cube">
+            <div class="cube" data-cube="0">
               <div class="bezel">
-                <canvas id="screen"></canvas>
+                <canvas id="screen-0"></canvas>
               </div>
               <div class="buttons">
-                <button class="btn" data-action="0" aria-label="Action 1"></button>
-                <button class="btn btn-star" data-action="random" aria-label="Surprise">★</button>
-                <button class="btn" data-action="2" aria-label="Action 3"></button>
+                <button class="btn" data-cube="0" data-action="0" aria-label="Action 1"></button>
+                <button class="btn btn-star" data-cube="0" data-action="random" aria-label="Surprise">★</button>
+                <button class="btn" data-cube="0" data-action="2" aria-label="Action 3"></button>
               </div>
             </div>
           </div>
-          <div class="slot slot-empty" data-slot="1"></div>
+          <div class="slot" data-slot="1">
+            <div class="cube" data-cube="1">
+              <div class="bezel">
+                <canvas id="screen-1"></canvas>
+              </div>
+              <div class="buttons">
+                <button class="btn" data-cube="1" data-action="0" aria-label="Action 1"></button>
+                <button class="btn btn-star" data-cube="1" data-action="random" aria-label="Surprise">★</button>
+                <button class="btn" data-cube="1" data-action="2" aria-label="Action 3"></button>
+              </div>
+            </div>
+          </div>
           <div class="slot slot-empty" data-slot="2"></div>
           <div class="slot slot-empty" data-slot="3"></div>
         </div>
@@ -47,7 +58,7 @@
       </aside>
     </main>
 
-    <footer class="hintstrip" id="hint">Press the buttons — your cubeman also lives on his own.</footer>
+    <footer class="hintstrip" id="hint">Click a cube to select it · Tab switches · Buttons act on the selected cubeman — they each live on their own.</footer>
 
     <div class="banner" id="banner" hidden></div>
     <script type="module" src="/src/main.ts"></script>

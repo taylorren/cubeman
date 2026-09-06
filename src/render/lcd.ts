@@ -46,8 +46,8 @@ export class LCD {
   }
 
   /**
-   * Draw a frame. Optional overlays are called with a context already
-   * transformed into 48×48 LCD space, before thresholding:
+   * Draw a single skeleton. Optional overlays are called with a context
+   * already transformed into 48×48 LCD space, before thresholding:
    * `behind` (ambience) draws first, then the skeleton, then `front`
    * (effects like "Z z z").
    */
@@ -55,6 +55,21 @@ export class LCD {
     s: Skeleton,
     frame: number,
     opts: { behind?: Overlay; front?: Overlay } = {},
+  ): void {
+    this.drawBatch(frame, {
+      behind: opts.behind,
+      sprites: [{ skeleton: s, front: opts.front }],
+    });
+  }
+
+  /**
+   * Compose SEVERAL skeletons over ONE shared backdrop — the shared-room
+   * case, where a resident and a visitor both stand in the same 48×48
+   * display. Each sprite may carry its own front overlay.
+   */
+  drawBatch(
+    frame: number,
+    opts: { behind?: Overlay; sprites: Array<{ skeleton: Skeleton; front?: Overlay }> },
   ): void {
     const { octx, px, ss } = this;
     const size = px * ss;
@@ -75,12 +90,27 @@ export class LCD {
       octx.lineTo(b[0], b[1]);
       octx.stroke();
     };
+    const skeleton = (s: Skeleton) => {
+      // torso
+      line(s.neck, s.hip);
+      // legs
+      line(s.hip, s.kL); line(s.kL, s.fL);
+      line(s.hip, s.kR); line(s.kR, s.fR);
+      // arms
+      line(s.neck, s.eL); line(s.eL, s.hL);
+      line(s.neck, s.eR); line(s.eR, s.hR);
+      // head
+      octx.beginPath();
+      octx.arc(s.head[0], s.head[1], 3.1, 0, Math.PI * 2);
+      octx.fill();
+    };
 
     if (opts.behind) opts.behind(octx, frame);
 
     // Body scale: the cubeman is drawn smaller than the authoring space
     // (like the original toy, ~half the screen height), pivoted at the
-    // ground so feet stay planted on the ambience floor.
+    // ground so feet stay planted on the ambience floor. Every sprite is
+    // drawn in this same transform so they overlap on one screen.
     const bs = this.bodyScale;
     octx.setTransform(
       ss * bs, 0, 0, ss * bs,
@@ -88,22 +118,11 @@ export class LCD {
       ss * (LCD.GROUND_Y - LCD.AUTHOR_FEET_Y * bs), // author feet land on ground
     );
     octx.lineWidth = 2.6 / bs; // keep limb thickness in screen units
+    for (const sprite of opts.sprites) skeleton(sprite.skeleton);
 
-    // torso
-    line(s.neck, s.hip);
-    // legs
-    line(s.hip, s.kL); line(s.kL, s.fL);
-    line(s.hip, s.kR); line(s.kR, s.fR);
-    // arms
-    line(s.neck, s.eL); line(s.eL, s.hL);
-    line(s.neck, s.eR); line(s.eR, s.hR);
-    // head
-    octx.beginPath();
-    octx.arc(s.head[0], s.head[1], 3.1, 0, Math.PI * 2);
-    octx.fill();
-
+    // front overlays live in full LCD space (post body-scale reset)
     octx.setTransform(ss, 0, 0, ss, 0, 0);
-    if (opts.front) opts.front(octx, frame);
+    for (const sprite of opts.sprites) if (sprite.front) sprite.front(octx, frame);
 
     // downsample ss×ss blocks (area average), then threshold to LCD segments.
     // Averaging instead of point-sampling gives smooth pixel coverage:

@@ -9,12 +9,14 @@ import { Cube } from './game/cube';
 import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
 import { VisitSession } from './game/visit';
+import { gameLog } from './core/debug';
 
 const FPS = 30;
 const PX = 48;
 const SCALE = 7;
 
 const prof = professions.stickman;
+gameLog.setEnabled(new URLSearchParams(window.location.search).get('debug') !== '0');
 
 // --- World: two cubes on the shelf --------------------------------------------
 
@@ -48,9 +50,19 @@ const visits: VisitSession[] = [];
 /** Run the visit once A has crossed into B's living room as a visitor. */
 function beginVisit(visitor: Cubeman): void {
   const host = cubemen.find((c) => c.home === visitor.cube && c !== visitor);
-  if (!host) return;
+  if (!host) {
+    gameLog.record('visit.session-rejected', { reason: 'no-host', visitor: visitor.debugState() });
+    return;
+  }
   // Don't start a second visit in the same host room concurrently.
-  if (visits.some((v) => v.host === host && !v.isEnded)) return;
+  if (visits.some((v) => v.host === host && !v.isEnded)) {
+    gameLog.record('visit.session-rejected', {
+      reason: 'host-already-in-session',
+      visitor: visitor.debugState(),
+      host: host.debugState(),
+    });
+    return;
+  }
   visits.push(new VisitSession(host, visitor, performance.now()));
 }
 
@@ -72,6 +84,34 @@ cubemen.push(
     onVisitArrived: beginVisit,
   }),
 );
+
+const debugControls = {
+  enable(): void {
+    gameLog.setEnabled(true);
+    gameLog.record('debug.snapshot', debugControls.snapshot());
+  },
+  disable(): void {
+    gameLog.setEnabled(false);
+  },
+  clear: () => gameLog.clear(),
+  export: () => gameLog.export(),
+  status: () => gameLog.status(),
+  flush: () => gameLog.flush(),
+  snapshot: () => ({
+    cubemen: cubemen.map((c) => c.debugState()),
+    visits: visits.map((v) => v.debugState()),
+  }),
+};
+
+declare global {
+  interface Window {
+    cubemanDebug: typeof debugControls;
+  }
+}
+window.cubemanDebug = debugControls;
+document.addEventListener('visibilitychange', () => {
+  gameLog.record('page.visibility', { state: document.visibilityState });
+});
 
 // --- Shell: per-cube rendering surfaces and scoped controls ------------------
 
@@ -259,4 +299,3 @@ const loop = new Loop(
   },
 );
 loop.start();
-

@@ -6,6 +6,8 @@ import type { Action, Profession } from '../content/professions';
 import { GRACE_MS, STAMINA, Stamina } from './stamina';
 import type { Cube } from './cube';
 import type { Shelf } from './shelf';
+import { gameLog } from '../core/debug';
+import type { LogDetails } from '../core/debug';
 
 function randRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -97,6 +99,41 @@ export class Cubeman {
     this.mode = { anim: this.prof.idle, loop: true };
     this.nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
     this.nextWander = performance.now() + randRange(WANDER_MIN_MS, WANDER_MAX_MS);
+    this.log('cubeman.spawn');
+  }
+
+  /** A read-only snapshot: no runtime objects or callbacks escape. */
+  debugState() {
+    const anim = this.mode.anim;
+    const mode = this.mode.action?.id ??
+      (this.mode.walkTarget !== undefined ? 'walk' :
+        anim === this.prof.idle ? 'idle' :
+          anim === this.prof.sleep ? 'sleep' :
+            anim === shared.sleepEnter ? 'sleep-enter' :
+              anim === shared.wake ? 'wake' :
+                anim === shared.chat ? 'chat' :
+                  anim === shared.wave ? 'wave' : 'animation');
+    return {
+      name: this.name,
+      home: this.home.id,
+      cube: this.cube.id,
+      room: this.cube.currentSceneId,
+      mode,
+      busy: this.busy,
+      frame: this.frame,
+      cx: Number(this.cx().toFixed(2)),
+      stamina: Number(this.energy.toFixed(2)),
+      role: this.inVisit ? (this.isVisitor ? 'visitor' : 'host') : 'solo',
+      walkTargetCx: this.mode.walkTarget === undefined
+        ? null : Number((24 + LCD.BODY_SCALE * this.mode.walkTarget).toFixed(2)),
+      graceUntilMs: Math.round(this.graceUntil),
+      nextActionAtMs: Math.round(this.nextSpontaneous),
+      nextWanderAtMs: Math.round(this.nextWander),
+    };
+  }
+
+  private log(event: string, details: LogDetails = {}): void {
+    if (gameLog.enabled) gameLog.record(event, { cubeman: this.debugState(), ...details });
   }
 
   // --- Position helpers ------------------------------------------------------
@@ -142,6 +179,7 @@ export class Cubeman {
     const slowdown = this.stamina.get() < STAMINA.TIRED ? STAMINA.TIRED_SLOWDOWN : 1;
     this.nextSpontaneous =
       performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS) * slowdown;
+    this.log('action.start', { action: action.id, source: spontaneous ? 'autonomous' : 'input' });
     this.onAction?.(action);
   }
 
@@ -212,6 +250,7 @@ export class Cubeman {
       walkTarget: this.cxToTarget(cxTarget),
       onEnd: next,
     };
+    this.log('walk.start', { targetCx: cxTarget });
   }
 
   /** Stroll to a random spot within the walkable range. Tired cubemen take
@@ -249,12 +288,18 @@ export class Cubeman {
    *  so this only ever sees `scene` edges and walls now. */
   private crossEdge(dir: 'left' | 'right', next: () => void): void {
     const edge = this.scene()[dir];
-    if (edge.kind !== 'scene') { next(); return; } // wall — stay put
+    if (edge.kind !== 'scene') {
+      this.log('room.blocked', { direction: dir, edge: edge.kind });
+      next();
+      return;
+    }
+    const from = this.cube.currentSceneId;
     this.stamina.spend(STAMINA.COST_CROSS);
     this.cube.currentSceneId = edge.id;
     this.roomLastVisited[this.scene().id] = performance.now();
     // enter from the opposite side and stroll a few steps inward
     this.x = this.cxToTarget(dir === 'right' ? 4 : 44);
+    this.log('room.enter', { from, direction: dir });
     this.startWalkTo(dir === 'right' ? 11 : 37, next);
   }
 
@@ -295,41 +340,65 @@ export class Cubeman {
    */
   private startVisit(): void {
     this.scheduleWander();
-    if (this.cube !== this.home || this.scene().id !== this.cube.hub().id) return;
-    const dir = this.connectedNeighborDir();
-    if (!dir) return; // not connected → no visit
-    const dest = this.shelf.neighborOf(this.cube, dir);
-    if (!dest || !this.shelf.canAcceptVisitor(dest, this)) return; // no / closed
+    this.log('visit.attempt');
+    if (this.cube !== this.home || this.scene().id !== this.cube.hub().id) {
+      this.log('visit.rejected', { reason: this.cube !== this.home ? 'not-home' : 'not-in-hub' });
+      return;
+    }
+    // Resolve the neighbor from the SHELF's slot table — not the room's
+    // scene-graph edge. In a 1×2 layout, cube-0's right neighbor is cube-1
+    // because the shelf says so, regardless of what the room edges declare.
+    const neighbor = this.visitableNeighbor();
+    if (!neighbor) {
+      this.log('visit.rejected', { reason: 'no-available-neighbor' });
+      return;
+    }
+    const { dir, dest } = neighbor;
+    if (!this.shelf.canAcceptVisitor(dest, this)) {
+      this.log('visit.rejected', {
+        reason: 'destination-unavailable',
+        destination: dest.id,
+        resident: this.shelf.residentOf(dest)?.debugState() ?? null,
+      });
+      return;
+    }
+    const from = this.cube.id;
     // teleport A into B's living room
     this.cube = dest;
     this.cube.currentSceneId = dest.hub().id;
     this.x = 0; // center of B's living room
     this.backToIdle();
+    this.log('visit.arrived', { from, direction: dir });
     this.onVisitArrived?.(this);
+  }
+
+  /** The adjacent cube (if any) reachable via the shelf's slot table. */
+  private visitableNeighbor(): { dir: 'left' | 'right'; dest: Cube } | null {
+    for (const dir of ['left', 'right'] as const) {
+      const dest = this.shelf.neighborOf(this.cube, dir);
+      if (dest) return { dir, dest };
+    }
+    return null;
   }
 
   /** Return home (teleport). Used by the VisitSession when the visit ends:
    *  the visitor disappears from the host's cube and reappears in its own
    *  living room. Callback-safe — `next` always runs. */
   private returnHome(next: () => void): void {
+    this.log('return.start');
     if (this.cube === this.home) {
+      this.log('return.arrived', { from: this.cube.id, alreadyHome: true });
       next();
       return;
     }
+    const from = this.cube.id;
     this.cube = this.home;
     this.cube.currentSceneId = this.home.hub().id;
     this.x = 0;
+    this.log('return.arrived', { from, alreadyHome: false });
     next();
   }
 
-  /** A neighbor exit that actually leads to a connected cube, or null. */
-  private connectedNeighborDir(): 'left' | 'right' | null {
-    const dirs: Array<'left' | 'right'> = [];
-    for (const d of ['left', 'right'] as const) {
-      if (this.scene()[d].kind === 'neighbor' && this.shelf.neighborOf(this.cube, d)) dirs.push(d);
-    }
-    return dirs.length === 0 ? null : dirs[Math.floor(Math.random() * dirs.length)]!;
-  }
 
   // --- The ball (a prop of whatever cube we're visiting) ------------------------
 
@@ -346,6 +415,7 @@ export class Cubeman {
   private nudgeBall(): void {
     this.cube.ball.v = 1.6; // kick it toward the bed side
     this.stamina.spend(STAMINA.COST_KICK);
+    this.log('ball.kick', { ballX: Number(this.cube.ball.x.toFixed(2)) });
     this.backToIdle();
   }
 
@@ -392,21 +462,29 @@ export class Cubeman {
     this.busy = true;
     this.mode = { anim: shared.wake, loop: false, onEnd: () => this.backToIdle() };
     this.frame = 0;
+    this.log('wake.start', { reason: 'rested' });
   }
 
   /** A press on a sleeping cubeman wakes it: stretch first, then act. */
   press(action: Action): void {
     // Dead buttons while visiting: A is in B's room, so A's own toy can't
     // trigger an action. (The host's buttons keep working — those are B's.)
-    if (this.isVisitor) return;
-    if (this.busy && this.mode.anim !== this.prof.sleep && this.mode.anim !== shared.sleepEnter)
+    if (this.isVisitor) {
+      this.log('input.ignored', { action: action.id, reason: 'visiting' });
       return;
+    }
+    if (this.busy && this.mode.anim !== this.prof.sleep && this.mode.anim !== shared.sleepEnter) {
+      this.log('input.ignored', { action: action.id, reason: 'busy' });
+      return;
+    }
+    this.log('input.accepted', { action: action.id });
     // toy ignores presses mid-trick — but falling asleep or asleep can be interrupted
     if (this.mode.anim === this.prof.sleep || this.mode.anim === shared.sleepEnter) {
       // ...but a press wakes it up: stretch first, then do the action
       this.busy = true;
       this.mode = { anim: shared.wake, loop: false, onEnd: () => this.runAction(action) };
       this.frame = 0;
+      this.log('wake.start', { reason: 'input', action: action.id });
     } else {
       this.runAction(action);
     }
@@ -423,9 +501,15 @@ export class Cubeman {
         this.mode = { anim: this.prof.sleep, loop: true };
         this.frame = 0;
         this.sleepStartAt = performance.now(); // minimum-nap clock starts now
+        this.log('sleep.start', {
+          inBed: this.sleptInBed,
+          earliestWakeAtMs: Math.round(this.sleepStartAt + STAMINA.MIN_NAP_MS),
+          wakeStamina: this.sleptInBed ? STAMINA.WAKE_FULL : STAMINA.WAKE_NAP,
+        });
       },
     };
     this.frame = 0;
+    this.log('sleep.enter', { inBed });
   }
 
   // --- Visit coordinator surface (called by VisitSession) -----------------------
@@ -438,6 +522,11 @@ export class Cubeman {
   /** True when THIS cubeman is the visitor (its keys are dead). */
   get isVisitor(): boolean {
     return this.inVisit?.isVisitor ?? false;
+  }
+
+  /** Body-center x on screen (for the session's positioning logic). */
+  get posX(): number {
+    return this.x;
   }
 
   /** Busy = mid-animation; the session waits for both to be free for beats. */
@@ -461,13 +550,35 @@ export class Cubeman {
     this.inVisit = null;
   }
 
+  /** Cancel any pending movement or animation and stand idle. Used by the
+   *  VisitSession to stop the host mid-walk (e.g. en route to the bedroom)
+   *  when a visit begins — otherwise the host keeps walking away from the
+   *  living room while the visitor arrives. */
+  resetMovement(): void {
+    this.busy = false;
+    this.mode = { anim: this.prof.idle, loop: true };
+    this.frame = 0;
+  }
+
+  /** Place this cubeman at a specific author-space x and stand idle — the
+   *  VisitSession uses this to seat the visitor and host at separate spots. */
+  setPosition(x: number): void {
+    this.x = x;
+    this.mode = { anim: this.prof.idle, loop: true };
+    this.frame = 0;
+  }
+
   /** Play a shared social gesture (a beat the session dispatched to BOTH
    *  participants together). Freely enters a one-shot pose cycle. */
   playSocial(anim: Anim): void {
-    if (this.busy) return;
+    if (this.busy) {
+      this.log('social.ignored', { reason: 'busy' });
+      return;
+    }
     this.busy = true;
     this.mode = { anim, loop: false, onEnd: () => this.backToIdle() };
     this.frame = 0;
+    this.log('social.start');
   }
 
   /** End the visit from this side: clear the session state and walk home.
@@ -478,15 +589,25 @@ export class Cubeman {
     this.returnHome(after);
   }
 
-  /** Leave the visit AND go straight to bed, or flop, on arriving home —
-   *  the visitor's "tired → home to sleep" exit. */
+  /** Leave the visit AND go straight to bed on arriving home — the
+   *  visitor's "tired → home to sleep" exit. Routes through the bedroom to
+   *  the sleepSpot (the living room has no bed, so a direct check there would
+   *  flop in the wrong room). */
   returnHomeToSleep(): void {
-    this.beginReturnHome(() => {
+    this.beginReturnHome(() => this.routeToBed());
+  }
+
+  /** Travel to the bedroom and lie down on the bed. Shared by the visit
+   *  tired-return and the normal bedtime routing. */
+  private routeToBed(): void {
+    const goToSpot = (): void => {
       const spot = this.scene().sleepSpot;
       if (spot && Math.abs(this.cx() - spot.cx) > 1.5)
         this.startWalkTo(spot.cx, () => this.fallAsleep(true));
       else this.fallAsleep(true);
-    });
+    };
+    if (this.scene().id === 'bedroom') goToSpot();
+    else this.travelTo('bedroom', goToSpot);
   }
 
   // --- Simulation tick -----------------------------------------------------------
@@ -505,10 +626,15 @@ export class Cubeman {
       const step = Math.sign(d) * Math.min(Math.abs(d), WALK_SPEED);
       this.x += step;
       this.stamina.spend(STAMINA.COST_WALK_PX * Math.abs(step) * LCD.BODY_SCALE);
-      if (this.x === this.mode.walkTarget) (this.mode.onEnd ?? (() => this.backToIdle()))();
+      if (this.x === this.mode.walkTarget) {
+        this.log('walk.arrived');
+        (this.mode.onEnd ?? (() => this.backToIdle()))();
+      }
     }
-    if (!this.mode.loop && this.mode.walkTarget === undefined && this.frame >= this.mode.anim.dur)
+    if (!this.mode.loop && this.mode.walkTarget === undefined && this.frame >= this.mode.anim.dur) {
+      this.log('animation.end');
       (this.mode.onEnd ?? (() => this.backToIdle()))();
+    }
 
     // In a visit, this cubeman does NOT steer itself: the VisitSession
     // dispatches social beats and judges when it goes home. Keep the anim
@@ -536,6 +662,7 @@ export class Cubeman {
       now >= this.graceUntil &&
       this.stamina.get() < STAMINA.FLOP_BELOW
     ) {
+      this.log('sleep.request', { reason: 'exhausted', kind: 'flop' });
       if (this.cube !== this.home) this.returnHome(() => this.flopAsleep());
       else this.flopAsleep();
       return;
@@ -549,12 +676,11 @@ export class Cubeman {
       now >= this.graceUntil &&
       (this.stamina.get() < STAMINA.SLEEP_AT || now - this.lastInteract > SLEEP_AFTER_MS)
     ) {
-      const bedtime = (): void => {
-        const spot = this.scene().sleepSpot;
-        if (spot && Math.abs(this.cx() - spot.cx) > 1.5)
-          this.startWalkTo(spot.cx, () => this.fallAsleep(true));
-        else this.fallAsleep(true);
-      };
+      this.log('sleep.request', {
+        reason: this.stamina.get() < STAMINA.SLEEP_AT ? 'low-stamina' : 'inactivity',
+        kind: 'bed',
+      });
+      const bedtime = (): void => this.routeToBed();
       if (this.cube !== this.home) this.returnHome(bedtime);
       else bedtime();
       return;

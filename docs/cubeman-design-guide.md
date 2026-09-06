@@ -284,3 +284,54 @@ teleports back to its own living room and the curtain lifts.
 Internal room doors (`scene` edges) still use the scene graph within a cube;
 `neighbor` edges and the shelf handle the cross-cube hop, kept distinct from
 scene ordering.
+
+## Debugging cubeman behavior
+
+Logging is enabled by default and records **visit boundaries only**: one
+`visit.started` entry and one `visit.closed` entry per completed visit. No
+spawn, movement, action, sleep, social-beat, or periodic status entries are
+written. A fresh log file appears when the first visit starts, not at startup.
+Open with `?debug=0` to disable logging, or run
+`window.cubemanDebug.disable()` in the browser's developer console to stop it
+for the current page. Use `window.cubemanDebug.enable()` to resume. Filter the
+console by `[cubeman]`. While running `pnpm dev` or `pnpm preview`, events are
+also posted to the local Vite server and appended to
+`logs/cubeman-YYYY-MM-DD.jsonl` (UTC date). Each line is one JSON event. These
+files survive page reloads and server restarts and are excluded from Git.
+
+Events include a page-session ID, sequence number, UTC timestamp, visit ID,
+host/visitor names, the visitor's home/current cube and room, and the visit's
+end deadline. The start records its planned duration; the end records elapsed
+time, timeout/tired/manual termination, whether sleep follows, and whether the
+visitor actually returned home.
+
+For a visitor that appears stuck, match `visit.started` with `visit.closed`
+using its page-session and visit IDs. Full live state remains available through
+`snapshot()` without adding entries to the log.
+
+Browser console commands:
+
+```js
+window.cubemanDebug.snapshot() // current cubemen and active visits, even when logging is off
+copy(window.cubemanDebug.export()) // copy the latest 500 events as JSON (DevTools helper)
+await window.cubemanDebug.flush() // wait for outstanding disk writes; rejects on failed delivery
+window.cubemanDebug.status() // pending/written/failed counts and the latest delivery error
+window.cubemanDebug.clear() // clear console-export history, NOT disk files
+window.cubemanDebug.disable() // stop recording and console output
+```
+
+The console-export buffer retains the latest 500 events from the current page;
+the disk files retain all successfully delivered events across pages and tabs.
+Use the page-session ID together with a visit ID to correlate visits across
+reloads. Enabling logging midway through a session records only subsequent
+boundaries; it cannot recover earlier events. Reloading enables logging again unless the
+URL contains `?debug=0`.
+
+Writes are dispatched immediately, with keepalive requests for navigation.
+Before deliberately reloading to investigate a problem, await `flush()` to
+confirm outstanding writes have completed. Delivery or disk errors appear in
+the console and `status()`; failed events may still be available in `export()`.
+A static-only deployment needs an equivalent `/__cubeman/logs` backend: the
+Vite logging endpoint is available in dev and preview, not in static build files.
+Daily log files are not automatically deleted; remove old files when no longer
+needed.

@@ -312,9 +312,21 @@ for (const c of roster) {
   const li = document.createElement('li');
   const locked = c.id.startsWith('mystery');
   li.className = 'chip' + (locked ? ' chip-locked' : '');
-  const face = document.createElement('span');
-  face.className = 'chip-face';
-  if (locked) face.textContent = '?';
+  // Avatar: a real LCD-rendered portrait of the cubeman's standing pose
+  // (locked entries stay mystery placeholders).
+  let face: HTMLElement;
+  if (locked) {
+    const span = document.createElement('span');
+    span.className = 'chip-face';
+    span.textContent = '?';
+    face = span;
+  } else {
+    const cv = document.createElement('canvas');
+    cv.className = 'chip-face';
+    cv.title = c.name;
+    new LCD(cv, 48, 1).draw(sample(prof.idle, 0), 0, {});
+    face = cv;
+  }
   const box = document.createElement('span');
   const name = document.createElement('div');
   name.className = 'chip-name';

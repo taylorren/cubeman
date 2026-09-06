@@ -7,7 +7,7 @@ import * as shared from './content/professions/shared';
 import type { Action } from './content/professions';
 import type { Anim } from './render/skeleton';
 import { Achievements } from './game/achievements';
-import { STAMINA, stamina } from './game/stamina';
+import { GRACE_MS, STAMINA, stamina } from './game/stamina';
 
 const FPS = 30;
 const PX = 48;
@@ -39,7 +39,11 @@ let mode: Mode = { anim: prof.idle, loop: true };
 let frame = 0;
 let busy = false;
 let lastInteract = performance.now();
-const SLEEP_AFTER_MS = 60_000;
+const SLEEP_AFTER_MS = 180_000;
+/** Set on every accepted press: bed/flop routing waits for the grace period. */
+let graceUntil = 0;
+/** When the current sleep started — naps have a minimum duration. */
+let sleepStartAt = 0;
 /** Where this nap is happening — bed naps refill fully, flops partially. */
 let sleptInBed = false;
 
@@ -97,7 +101,10 @@ function startAction(action: Action, spontaneous = false): void {
   mode = { anim: action.anim, loop: false, action, onEnd: backToIdle };
   frame = 0;
   stamina.spend(action.effort ?? 8); // user presses still perform, but cost energy
-  if (!spontaneous) lastInteract = performance.now();
+  if (!spontaneous) {
+    lastInteract = performance.now();
+    graceUntil = lastInteract + GRACE_MS; // interaction beats recovery
+  }
   // any ACTUAL action consumes the pending spontaneous slot (user-triggered
   // ones included) — idling/wandering never postpones it. Tired cubemen
   // space their tricks further apart.
@@ -105,6 +112,20 @@ function startAction(action: Action, spontaneous = false): void {
   nextSpontaneous =
     performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS) * slowdown;
   achievements.record(action.id);
+}
+
+/** Pick an action, favoring cheaper ones when tired — flips stay possible,
+ *  just rarer. */
+function pickAction(pool: Action[]): Action {
+  const tired = stamina.get() < STAMINA.TIRED;
+  if (!tired) return pool[Math.floor(Math.random() * pool.length)]!;
+  const weights = pool.map((a) => 1 / (a.effort ?? 8));
+  let r = Math.random() * weights.reduce((s, w) => s + w, 0);
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i]!;
+    if (r <= 0) return pool[i]!;
+  }
+  return pool[pool.length - 1]!;
 }
 
 // --- Stage discipline: wide actions need room -------------------------------
@@ -291,6 +312,7 @@ function fallAsleep(inBed = false): void {
       busy = false;
       mode = { anim: prof.sleep, loop: true };
       frame = 0;
+      sleepStartAt = performance.now(); // minimum-nap clock starts now
     },
   };
   frame = 0;
@@ -431,17 +453,19 @@ const loop = new Loop(
       const d = mode.walkTarget - x;
       if (Math.abs(d) <= WALK_SPEED) {
         x = mode.walkTarget;
-        stamina.spend(STAMINA.COST_STROLL);
         (mode.onEnd ?? backToIdle)();
       } else {
         x += Math.sign(d) * WALK_SPEED;
+        stamina.spend(STAMINA.COST_WALK_PX * WALK_SPEED);
       }
     }
     if (!mode.loop && mode.walkTarget === undefined && frame >= mode.anim.dur)
       (mode.onEnd ?? backToIdle)();
-    // rested enough? wake up (full tank from bed, partial from a flop)
+    // rested enough? wake up (bed sleep ends at 90, flops at 55) — but only
+    // after the minimum nap duration; a press can always interrupt sooner
     if (
       mode.anim === prof.sleep &&
+      performance.now() - sleepStartAt >= STAMINA.MIN_NAP_MS &&
       stamina.get() >= (sleptInBed ? STAMINA.WAKE_FULL : STAMINA.WAKE_NAP)
     ) {
       wakeFromSleep();
@@ -449,16 +473,23 @@ const loop = new Loop(
     }
     // too drained even to walk to the bedroom? flop into an in-place nap
     // right here (checked BEFORE ordinary bed routing, which would otherwise
-    // always win — the flop tier would be unreachable)
-    if (!busy && mode.anim === prof.idle && stamina.get() < STAMINA.FLOP_BELOW) {
-      flopAsleep();
-      return;
-    }
-    // nap time: exhaustion (even under active play) or being ignored for 60s —
-    // travel to the bedroom, walk to the bed, lie down
+    // always win — the flop tier would be unreachable). Interaction grace
+    // postpones both.
     if (
       !busy &&
       mode.anim === prof.idle &&
+      performance.now() >= graceUntil &&
+      stamina.get() < STAMINA.FLOP_BELOW
+    ) {
+      flopAsleep();
+      return;
+    }
+    // nap time: low stamina or being ignored for 180s — travel to the
+    // bedroom, walk to the bed, lie down (grace period postpones this too)
+    if (
+      !busy &&
+      mode.anim === prof.idle &&
+      performance.now() >= graceUntil &&
       (stamina.get() < STAMINA.SLEEP_AT ||
         performance.now() - lastInteract > SLEEP_AFTER_MS)
     ) {
@@ -471,21 +502,15 @@ const loop = new Loop(
       return;
     }
     // spontaneous trick while idle — self-entertainment does NOT reset the
-    // sleep timer (only the user's presses do). Exhausted cubemen skip tricks.
+    // sleep timer (only the user's presses do). Exhausted cubemen skip tricks;
+    // tired ones favor cheaper tricks (flips stay possible, just rarer).
     if (
       !busy &&
       mode.anim === prof.idle &&
       stamina.get() >= STAMINA.EXHAUSTED &&
       performance.now() >= nextSpontaneous
     ) {
-      // tired cubemen bias toward low-effort tricks
-      const pool =
-        stamina.get() < STAMINA.TIRED
-          ? prof.actions.filter((a) => (a.effort ?? 8) <= 8)
-          : prof.actions;
-      runAction((pool.length ? pool : prof.actions)[
-        Math.floor(Math.random() * (pool.length ? pool.length : prof.actions.length))
-      ]!, true);
+      runAction(pickAction(prof.actions), true);
       return;
     }
     // wander / kick the ball / explore another room

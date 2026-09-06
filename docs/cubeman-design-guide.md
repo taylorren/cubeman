@@ -131,21 +131,27 @@ will drive walk-to-edge → cross-cube transitions in P2.
 The cubeman has an invisible 0–100 `stamina` that shapes his **autonomous**
 life. It is never shown as a bar — tiredness is communicated only through
 behavior. **User presses always perform** (and still cost energy); only
-self-directed behavior respects the budget.
+self-directed behavior respects the budget. Target balance: **~2–3 minutes of
+awake life per nap, 15–20s naps**. Stamina changes personality *before* it
+interrupts activity.
 
-- **Spending**: each action costs its `effort` (per-action field, default 8;
-  Stickman: backflip 12, cartwheel 10, wave 6), kicks 5, each completed walk
-  1.5, each room crossing 2.
-- **Recovery**: **sleep is the ONLY recovery channel** (~100 over 50s of sleep).
-  Standing around regenerates nothing. If stamina < SLEEP_AT (40) he goes to
-  bed even under active play; the 60s ignore timer independently sends him to
-  bed too (bored ≠ tired, but both lead to naps).
-- **Tired (<60)**: spontaneous tricks space out ×1.8 and bias to low-effort
-  actions; strolls become short hops.
-- **Exhausted (<30)**: no autonomous tricks at all.
-- **Flop (<10)**: too drained to walk to the bedroom — he lies down *where he
-  is* and naps to ~60, then gets up (and will walk to bed next time).
-- **Waking**: bed sleep ends at a full tank (100), flops at 60.
+- **Spending**: per-action `effort` (Stickman: backflip 8, cartwheel 6, wave 2;
+  default 8), ball kick 2, walking 0.05 per screen pixel, room crossing 0.5.
+- **Recovery**: **sleep is the ONLY recovery channel** — 4/s of sleep
+  (bed: 25→90 in ~16s; flop: 8→55 in ~12s). Standing around regenerates
+  nothing.
+- **Tired (<55)**: tricks scheduled 1.4× farther apart and weighted toward
+  cheaper ones (flips stay possible, just rarer); strolls become short hops.
+- **Exhausted (<30)**: no autonomous tricks — gentle wandering only.
+- **Bed (<25)**: walks to the bedroom and sleeps (even under active play).
+- **Flop (<8)**: too drained to reach the bed — lies down *where he is*.
+- **Waking**: bed at 90, flop at 55; naps last ≥6s before auto-waking
+  (a press interrupts immediately).
+- **Interaction priority**: every accepted press starts a 10s grace period in
+  which neither bed-routing nor flopping begins; when the player stops,
+  recovery resumes naturally.
+- **Boredom**: after 180s of no interaction he naps too (independent of
+  stamina; boring ≠ tired, both lead to naps).
 
 Tune all thresholds/costs in `STAMINA` (one config object). New professions:
 give each action an `effort` that reflects its spectacle.

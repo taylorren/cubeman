@@ -8,28 +8,34 @@
 
 export const STAMINA = {
   MAX: 100,
-  /** Full refill over ~50s of sleep (30fps): 100 / 1500 ticks. */
-  REGEN_PER_TICK: 100 / 1500,
+  /** 4/s from elapsed sim time (30fps): 4/30 per tick. */
+  REGEN_PER_TICK: 4 / 30,
 
   /** Autonomous tricks stop below this. */
   EXHAUSTED: 30,
-  /** Tricks get rarer + low-effort-biased below this. */
-  TIRED: 60,
-  /** Too drained to even wander — flops into an in-place nap. */
-  FLOP_BELOW: 10,
+  /** Tricks scheduled 1.4× farther apart + cheaper tricks favored below this. */
+  TIRED: 55,
+  /** Too drained to reach the bed — flops into an in-place nap. */
+  FLOP_BELOW: 8,
   /** Auto-sleep (goes to bed) below this, even with recent interaction. */
-  SLEEP_AT: 40,
+  SLEEP_AT: 25,
   /** In-place nap ends (wake up) at this level. */
-  WAKE_NAP: 60,
+  WAKE_NAP: 55,
   /** Bed sleep ends (wake up) at this level. */
-  WAKE_FULL: 100,
+  WAKE_FULL: 90,
+  /** A nap lasts at least this long before auto-waking (ms). */
+  MIN_NAP_MS: 6_000,
 
-  COST_KICK: 5,
-  COST_STROLL: 1.5,
-  COST_CROSS: 2,
+  COST_KICK: 2,
+  /** Stamina per screen pixel walked. */
+  COST_WALK_PX: 0.05,
+  COST_CROSS: 0.5,
   /** Spontaneous-trick schedule stretches by this when tired. */
-  TIRED_SLOWDOWN: 1.8,
+  TIRED_SLOWDOWN: 1.4,
 } as const;
+
+/** After an accepted press, behavior-recovery (bed/flop) waits this long. */
+export const GRACE_MS = 10_000;
 
 let value: number = STAMINA.MAX;
 

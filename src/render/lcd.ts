@@ -17,6 +17,12 @@ export class LCD {
   private readonly ss = 4;
   /** Cubeman body scale relative to the 48×48 authoring space. */
   static readonly BODY_SCALE = 0.72;
+  /** Rendered half-thickness of limbs in *screen* pixels (author-space
+   *  stroke width 2.6 is divided by body scale, so it stays constant on
+   *  screen — game logic uses this for on-screen bounds). */
+  static readonly LIMB_RADIUS = 2.6 / 2;
+  /** Head radius in author-space units (scaled by BODY_SCALE on screen). */
+  static readonly HEAD_RADIUS = 3.1;
   private readonly bodyScale = LCD.BODY_SCALE;
   /** Screen row the ground sits on (floor = bottom rim of the screen). */
   static readonly GROUND_Y = 46;

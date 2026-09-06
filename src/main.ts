@@ -112,10 +112,13 @@ function actionExtent(a: Action): number {
   return e;
 }
 
-/** Body-center band within which every frame of the action stays ≥1px
- *  inside the display: joint reach = 24 + scale·(|x-offset| + extent). */
+/** Body-center band within which every *rendered* frame of the action stays
+ *  ≥1px inside the display: joint reach = 24 + scale·(|x-offset| + extent),
+ *  plus the joint's rendered radius (limb stroke or head disc, whichever is
+ *  larger) must also fit. */
 function safeBand(a: Action): [number, number] {
-  const half = 23 - LCD.BODY_SCALE * actionExtent(a);
+  const r = Math.max(LCD.LIMB_RADIUS, LCD.HEAD_RADIUS * LCD.BODY_SCALE);
+  const half = 23 - r - LCD.BODY_SCALE * actionExtent(a);
   return [Math.max(3, 24 - half), Math.min(45, 24 + half)];
 }
 

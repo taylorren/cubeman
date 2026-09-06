@@ -135,12 +135,14 @@ one of its own `actions` every 6–14 seconds. Consequences for content:
   hand-shifted. `WANDER_RANGE` (±8 author px) keeps every pose, including the
   lying sleep pose, safely on screen.
 - **Stage discipline**: actions are checked for horizontal reach
-  (`animExtent` — max joint |x−24| over keyframes) and get a *safe body-center
-  band*; if the cubeman stands outside it (e.g. against a wall), he first
-  strolls back toward center stage, then performs. So wide moves (cartwheel)
-  are never clipped by the bezel, and narrow spots near furniture still allow
-  standing/idling. Intentional room-crossing walks off the screen edge are
-  exempt — they use `startWalkTo` directly, not `runAction`.
+  (`animExtent` — max joint |x−24| over keyframes) *plus rendered thickness*
+  (limb stroke half-width, head disc — `LCD.LIMB_RADIUS` / `HEAD_RADIUS`) and
+  get a *safe body-center band*; if the cubeman stands outside it (e.g. against
+  a wall), he first strolls back toward center stage, then performs. So wide
+  moves (cartwheel) are never clipped by the bezel, and narrow spots near
+  furniture still allow standing/idling. Intentional room-crossing walks off
+  the screen edge are exempt — they use `startWalkTo` directly, not
+  `runAction`.
 
 ## Ambience & props
 

@@ -2,7 +2,14 @@ type LogValue = string | number | boolean | null | readonly LogValue[] | { [key:
 export type LogDetails = Record<string, LogValue>;
 
 const MAX_EVENTS = 500;
-const VISIT_BOUNDARIES = new Set(['visit.started', 'visit.closed']);
+const PERSISTED_EVENTS = new Set([
+  'visit.started',
+  'visit.closed',
+  'sleep.request',
+  'sleep.enter',
+  'sleep.start',
+  'wake.start',
+]);
 const events: string[] = [];
 let enabled = false;
 let sequence = 0;
@@ -41,7 +48,7 @@ export const gameLog = {
   },
 
   record(event: string, details: LogDetails = {}): void {
-    if (!enabled || !VISIT_BOUNDARIES.has(event)) return;
+    if (!enabled || !PERSISTED_EVENTS.has(event)) return;
     const entry = JSON.stringify({
       ...details,
       sessionId,

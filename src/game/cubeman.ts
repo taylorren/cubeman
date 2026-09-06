@@ -21,9 +21,6 @@ const WANDER_MAX_MS = 6_000;
 const SLEEP_AFTER_MS = 180_000;
 const WALK_SPEED = 0.3; // author px per frame
 
-/** How long a visit lasts before the cubeman heads home on its own. */
-const VISIT_MIN_MS = 20_000;
-const VISIT_MAX_MS = 40_000;
 /** Wander-roll odds of autonomously deciding to visit a neighbor. */
 const VISIT_CHANCE = 0.12;
 
@@ -46,6 +43,9 @@ export interface CubemanOpts {
   shelf: Shelf;
   /** App-level progression hook (achievements record every action). */
   onAction?: (action: Action) => void;
+  /** Called right after this cubeman arrives in a neighbor's living room as
+   *  a visitor — the app layer builds the VisitSession from here. */
+  onVisitArrived?: (visitor: Cubeman) => void;
 }
 
 /**
@@ -61,6 +61,7 @@ export class Cubeman {
   readonly home: Cube;
   private readonly shelf: Shelf;
   private readonly onAction?: (action: Action) => void;
+  private readonly onVisitArrived?: (visitor: Cubeman) => void;
 
   /** Where the cubeman currently is — NOT necessarily its home cube. */
   cube: Cube;
@@ -81,8 +82,9 @@ export class Cubeman {
   private nextWander: number;
   /** Timestamp of each room's last visit — drives fair room rotation. */
   private roomLastVisited: Record<string, number> = {};
-  /** While visiting a neighbor: when to head home (0 = at home). */
-  private visitingUntil = 0;
+  /** Set while participating in a visit: whether THIS one is the visitor.
+   *  Suppresses solo autonomy (living-room-only) and deadens visitor keys. */
+  private inVisit: { isVisitor: boolean } | null = null;
 
   constructor(opts: CubemanOpts) {
     this.name = opts.name;
@@ -91,6 +93,7 @@ export class Cubeman {
     this.cube = opts.home;
     this.shelf = opts.shelf;
     this.onAction = opts.onAction;
+    this.onVisitArrived = opts.onVisitArrived;
     this.mode = { anim: this.prof.idle, loop: true };
     this.nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
     this.nextWander = performance.now() + randRange(WANDER_MIN_MS, WANDER_MAX_MS);
@@ -241,28 +244,16 @@ export class Cubeman {
    * exits: the shelf resolves them to a connected cube, and an unconnected
    * exit behaves exactly like a wall (no-op, callback still fires).
    */
+  /** Cross an internal room edge (scene → scene) within the SAME cube.
+   *  Cross-cube travel is handled by direct teleport in startVisit/returnHome,
+   *  so this only ever sees `scene` edges and walls now. */
   private crossEdge(dir: 'left' | 'right', next: () => void): void {
     const edge = this.scene()[dir];
-    if (edge.kind === 'scene') {
-      this.stamina.spend(STAMINA.COST_CROSS);
-      this.cube.currentSceneId = edge.id;
-      this.roomLastVisited[this.scene().id] = performance.now();
-      // enter from the opposite side and stroll a few steps inward
-      this.x = this.cxToTarget(dir === 'right' ? 4 : 44);
-      this.startWalkTo(dir === 'right' ? 11 : 37, next);
-      return;
-    }
-    if (edge.kind !== 'neighbor') { next(); return; } // wall — stay put
-    const dest = this.shelf.neighborOf(this.cube, dir);
-    if (!dest) { next(); return; } // no cube connected on this side: it's a wall
-    // The visit proper: leave this cube, appear in the neighbor's hub.
-    // (Visitor CAPACITY is enforced at the point of departure in
-    // startVisit, not here — so a cubeman can ALWAYS return home even if
-    // the other is visiting there right now.)
+    if (edge.kind !== 'scene') { next(); return; } // wall — stay put
     this.stamina.spend(STAMINA.COST_CROSS);
-    this.cube = dest;
-    this.cube.currentSceneId = dest.hub().id;
+    this.cube.currentSceneId = edge.id;
     this.roomLastVisited[this.scene().id] = performance.now();
+    // enter from the opposite side and stroll a few steps inward
     this.x = this.cxToTarget(dir === 'right' ? 4 : 44);
     this.startWalkTo(dir === 'right' ? 11 : 37, next);
   }
@@ -295,61 +286,40 @@ export class Cubeman {
   // --- Visiting a neighboring cube ---------------------------------------------
 
   /**
-   * Autonomous "visit": walk into a connected neighbor's living room for a
-   * while. It triggers ONLY from home AND only from the living room (the
-   * hub) — that is where the neighbor exits live — and only when a neighbor
-   * is actually connected. If any of those conditions fail this is a clean
-   * no-op, so the caller never needs to check again.
+   * Autonomous "visit": A decides to visit a connected neighbor B.
+   * Simple model — no animation of crossing:
+   *   1. A decides (only from home, in the living room, to a connected cube)
+   *   2. Check B is home (canAcceptVisitor) → A disappears from A's cube and
+   *      appears in B's living room; the coordinator (VisitSession) starts.
+   *   3. Not home → nothing happens, A continues its solo life.
    */
   private startVisit(): void {
     this.scheduleWander();
     if (this.cube !== this.home || this.scene().id !== this.cube.hub().id) return;
     const dir = this.connectedNeighborDir();
-    if (!dir) return; // not connected → no visit (exit behaves as a wall)
+    if (!dir) return; // not connected → no visit
     const dest = this.shelf.neighborOf(this.cube, dir);
-    if (!dest) return; // not connected → no visit (exit behaves as a wall)
-    if (!this.shelf.canAcceptVisitor(dest, this)) return; // host already has a visitor
-    this.crossEdge(dir, () => {
-      // arrived in the neighbor's living room — set the "head home by" clock
-      this.visitingUntil = performance.now() + randRange(VISIT_MIN_MS, VISIT_MAX_MS);
-      this.backToIdle();
-    });
+    if (!dest || !this.shelf.canAcceptVisitor(dest, this)) return; // no / closed
+    // teleport A into B's living room
+    this.cube = dest;
+    this.cube.currentSceneId = dest.hub().id;
+    this.x = 0; // center of B's living room
+    this.backToIdle();
+    this.onVisitArrived?.(this);
   }
 
-  /**
-   * Walk back into the home cube (via the shelf connection), then `next`.
-   * Neighbor exits only exist on the living room, so if we've wandered
-   * deeper into the neighbor's rooms, first route back to its hub, then
-   * cross out. Explicitly callback-safe: if no connection leads home, `next`
-   * still runs — the cubeman never freezes waiting for a door that isn't there.
-   */
+  /** Return home (teleport). Used by the VisitSession when the visit ends:
+   *  the visitor disappears from the host's cube and reappears in its own
+   *  living room. Callback-safe — `next` always runs. */
   private returnHome(next: () => void): void {
     if (this.cube === this.home) {
-      this.visitingUntil = 0;
       next();
       return;
     }
-    const crossOut = (): void => {
-      const dir = ['left', 'right'].find(
-        (d) =>
-          this.scene()[d as 'left' | 'right'].kind === 'neighbor' &&
-          this.shelf.neighborOf(this.cube, d as 'left' | 'right') === this.home,
-      );
-      if (!dir) {
-        this.visitingUntil = 0;
-        next();
-        return;
-      }
-      const edgeCx = dir === 'right' ? 45 : 3;
-      this.startWalkTo(edgeCx, () =>
-        this.crossEdge(dir as 'left' | 'right', () => {
-          this.visitingUntil = 0; // home again
-          next();
-        }),
-      );
-    };
-    if (this.scene().id === this.cube.hub().id) crossOut();
-    else this.travelTo(this.cube.hub().id, crossOut);
+    this.cube = this.home;
+    this.cube.currentSceneId = this.home.hub().id;
+    this.x = 0;
+    next();
   }
 
   /** A neighbor exit that actually leads to a connected cube, or null. */
@@ -426,6 +396,9 @@ export class Cubeman {
 
   /** A press on a sleeping cubeman wakes it: stretch first, then act. */
   press(action: Action): void {
+    // Dead buttons while visiting: A is in B's room, so A's own toy can't
+    // trigger an action. (The host's buttons keep working — those are B's.)
+    if (this.isVisitor) return;
     if (this.busy && this.mode.anim !== this.prof.sleep && this.mode.anim !== shared.sleepEnter)
       return;
     // toy ignores presses mid-trick — but falling asleep or asleep can be interrupted
@@ -455,6 +428,67 @@ export class Cubeman {
     this.frame = 0;
   }
 
+  // --- Visit coordinator surface (called by VisitSession) -----------------------
+
+  /** Is this cubeman currently participating in a visit? */
+  get inVisitMode(): boolean {
+    return this.inVisit !== null;
+  }
+
+  /** True when THIS cubeman is the visitor (its keys are dead). */
+  get isVisitor(): boolean {
+    return this.inVisit?.isVisitor ?? false;
+  }
+
+  /** Busy = mid-animation; the session waits for both to be free for beats. */
+  get isBusy(): boolean {
+    return this.busy;
+  }
+
+  /** Live stamina read (the session uses it to decide when to go home to
+   *  sleep). Solo sleep routing is suspended during a visit, so this is the
+   *  only tether to the energy budget while together. */
+  get energy(): number {
+    return this.stamina.get();
+  }
+
+  /** Enter the together state. `isVisitor` gates keys and solo autonomy. */
+  setInVisit(isVisitor: boolean): void {
+    this.inVisit = { isVisitor };
+  }
+
+  clearInVisit(): void {
+    this.inVisit = null;
+  }
+
+  /** Play a shared social gesture (a beat the session dispatched to BOTH
+   *  participants together). Freely enters a one-shot pose cycle. */
+  playSocial(anim: Anim): void {
+    if (this.busy) return;
+    this.busy = true;
+    this.mode = { anim, loop: false, onEnd: () => this.backToIdle() };
+    this.frame = 0;
+  }
+
+  /** End the visit from this side: clear the session state and walk home.
+   *  A visitor always returns home even if the other is visiting *its* home
+   *  at the same moment (seat capacity is only enforced at departure). */
+  beginReturnHome(after = () => this.backToIdle()): void {
+    this.clearInVisit();
+    this.returnHome(after);
+  }
+
+  /** Leave the visit AND go straight to bed, or flop, on arriving home —
+   *  the visitor's "tired → home to sleep" exit. */
+  returnHomeToSleep(): void {
+    this.beginReturnHome(() => {
+      const spot = this.scene().sleepSpot;
+      if (spot && Math.abs(this.cx() - spot.cx) > 1.5)
+        this.startWalkTo(spot.cx, () => this.fallAsleep(true));
+      else this.fallAsleep(true);
+    });
+  }
+
   // --- Simulation tick -----------------------------------------------------------
 
   /** One fixed-timestep update: autonomous life, movement, recovery. */
@@ -475,6 +509,11 @@ export class Cubeman {
     }
     if (!this.mode.loop && this.mode.walkTarget === undefined && this.frame >= this.mode.anim.dur)
       (this.mode.onEnd ?? (() => this.backToIdle()))();
+
+    // In a visit, this cubeman does NOT steer itself: the VisitSession
+    // dispatches social beats and judges when it goes home. Keep the anim
+    // clock/movement above, but skip all solo autonomy and sleep routing.
+    if (this.inVisit) return;
 
     const now = performance.now();
     // rested enough? wake up (bed sleep ends at 90, flops at 55) — but only
@@ -536,13 +575,7 @@ export class Cubeman {
     // play / wander. A visit is only possible from home's living room and
     // only across a connected edge — startVisit() no-ops otherwise.
     if (!this.busy && this.mode.anim === this.prof.idle && now >= this.nextWander) {
-      if (this.visitingUntil) {
-        // Visiting: stay for a while, then head home.
-        if (now >= this.visitingUntil) {
-          this.returnHome(() => this.backToIdle());
-          return;
-        }
-      } else if (Math.random() < VISIT_CHANCE) {
+      if (Math.random() < VISIT_CHANCE) {
         this.startVisit();
         return;
       }

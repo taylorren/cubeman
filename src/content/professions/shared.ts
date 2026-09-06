@@ -290,3 +290,53 @@ export const wake: Anim = {
     { t: 30, pose: pose() },
   ],
 };
+
+// --- Social gestures (coordinated pair behaviors during a visit) --------------
+// Played by BOTH cubemen at once (the VisitSession dispatches a shared beat),
+// so they read as chatting / waving at each other. Authored at x=24 like all
+// poses; each player shifts by its own position.
+
+/** Talk face-to-face: nod left and right with a "talking" hand. */
+export const chat: Anim = {
+  dur: 30,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    {
+      t: 8,
+      pose: pose({
+        head: [25.5, 8.5], neck: [25.5, 13.5],
+        eR: [29, 10], hR: [32.5, 6],
+      }),
+    },
+    {
+      t: 16,
+      pose: pose({
+        head: [22.5, 8.5], neck: [22.5, 13.5],
+        eL: [19, 10], hL: [15.5, 6],
+      }),
+    },
+    {
+      t: 24,
+      pose: pose({
+        head: [24, 9], neck: [24, 14],
+        eR: [29, 10], hR: [33, 6],
+      }),
+    },
+    { t: 30, pose: pose() },
+  ],
+};
+
+/** A friendly wave hello/goodbye, one arm up and swaying. */
+export const wave: Anim = {
+  dur: 28,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    { t: 5, pose: pose({ eR: [27, 10], hR: [30, 5] }) },
+    { t: 10, pose: pose({ eR: [27, 10], hR: [33, 6] }) },
+    { t: 15, pose: pose({ eR: [27, 10], hR: [30, 6] }) },
+    { t: 20, pose: pose({ eR: [28, 10], hR: [31, 5] }) },
+    { t: 28, pose: pose() },
+  ],
+};

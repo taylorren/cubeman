@@ -40,10 +40,19 @@ export class Shelf {
 
   /**
    * Visiting capacity: one resident plus AT MOST one visitor, and never
-   * the same cubeman twice. Keeps shared-room occupancy sane.
+   * the same cubeman twice. Keeps shared-room occupancy sane. Also, a cube
+   * is CLOSED (curtain down) while its resident is away visiting — you can't
+   * visit someone who isn't home, so it won't accept a visitor then.
    */
   canAcceptVisitor(cube: Cube, visitor: Cubeman): boolean {
     if (visitor.cube === cube) return false; // already inside
+    const resident = this.residentOf(cube);
+    if (resident && resident.cube !== cube) return false; // resident is away (closed)
     return !this.cubemen.some((c) => c !== visitor && c.cube === cube && c.home !== cube);
+  }
+
+  /** The cubeman whose HOME is `cube` (its resident owner). */
+  residentOf(cube: Cube): Cubeman | undefined {
+    return this.cubemen.find((c) => c.home === cube);
   }
 }

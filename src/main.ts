@@ -8,6 +8,7 @@ import { Achievements } from './game/achievements';
 import { Cube } from './game/cube';
 import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
+import { VisitSession } from './game/visit';
 
 const FPS = 30;
 const PX = 48;
@@ -41,6 +42,18 @@ const achievements = new Achievements((a) => {
   renderGoals();
 });
 
+/** Active visits — the coordinator owning each togetherness. */
+const visits: VisitSession[] = [];
+
+/** Run the visit once A has crossed into B's living room as a visitor. */
+function beginVisit(visitor: Cubeman): void {
+  const host = cubemen.find((c) => c.home === visitor.cube && c !== visitor);
+  if (!host) return;
+  // Don't start a second visit in the same host room concurrently.
+  if (visits.some((v) => v.host === host && !v.isEnded)) return;
+  visits.push(new VisitSession(host, visitor, performance.now()));
+}
+
 cubemen.push(
   new Cubeman({
     name: 'Sticko',
@@ -48,6 +61,7 @@ cubemen.push(
     home: cubeA,
     shelf,
     onAction: (a) => achievements.record(a.id),
+    onVisitArrived: beginVisit,
   }),
   new Cubeman({
     name: 'Pip',
@@ -55,19 +69,21 @@ cubemen.push(
     home: cubeB,
     shelf,
     onAction: (a) => achievements.record(a.id),
+    onVisitArrived: beginVisit,
   }),
 );
 
 // --- Shell: per-cube rendering surfaces and scoped controls ------------------
 
-type Toy = { slot: HTMLElement; cubeman: Cubeman; lcd: LCD };
+type Toy = { slot: HTMLElement; cubeman: Cubeman; lcd: LCD; buttons: HTMLButtonElement[] };
 
 // Each cube gets its own rendering surface. Its cubeman is the resident;
 // visitors render onto the SAME surface (shared-room occupancy).
 const toys: Toy[] = cubemen.map((cubeman, i) => {
   const slot = document.querySelector<HTMLElement>(`.slot[data-slot="${i}"]`)!;
   const canvas = slot.querySelector('canvas')!;
-  return { slot, cubeman, lcd: new LCD(canvas, PX, SCALE) };
+  const buttons = [...slot.querySelectorAll<HTMLButtonElement>('button[data-action]')];
+  return { slot, cubeman, lcd: new LCD(canvas, PX, SCALE), buttons };
 });
 
 let selected = 0;
@@ -194,6 +210,13 @@ const zzzOverlay: Overlay = (ctx, frame) => {
   }
 };
 
+const curtainOverlay: Overlay = (ctx) => {
+  // A dropped curtain across an empty, closed cube: a rod at the top and
+  // vertical folds hanging down — the "nobody's home" signal.
+  ctx.fillRect(0, 4, 48, 1); // rod
+  for (let x = 2; x < 47; x += 6) ctx.fillRect(x, 5, 2, 41); // folds
+};
+
 // --- Loop: ONE loop updates the world and renders every occupied slot -------
 
 let wsFrame = 0;
@@ -203,20 +226,34 @@ const loop = new Loop(
     // worlds evolve even when nobody is home (the ball keeps its roll)
     for (const cube of shelf.cubes()) cube.tick();
     for (const cubeman of cubemen) cubeman.tick();
+    // advance visits and drop any that have ended (their visitor is
+    // returning home on its own now)
+    const now = performance.now();
+    for (const v of visits) v.tick(now);
+    for (let i = visits.length - 1; i >= 0; i--) if (visits[i]!.isEnded) visits.splice(i, 1);
   },
   () => {
     wsFrame++;
     // Each cube's display shows its current room, then EVERY cubeman
     // standing in that cube — the resident and any visitor share the
-    // surface (shared-room occupancy).
+    // surface (shared-room occupancy). A cube whose resident is away shows
+    // a curtain instead of characters, and its controls go dead.
     for (const toy of toys) {
-      const occupants = cubemen.filter((c) => c.cube === toy.cubeman.cube);
+      const cube = toy.cubeman.home;
+      const closed = toy.cubeman.cube !== cube; // resident is out visiting
+      const occupants = cubemen.filter((c) => c.cube === cube);
+      // dead buttons for a visitor; host's stay live
+      for (const b of toy.buttons) b.disabled = toy.cubeman.isVisitor;
+      toy.slot.classList.toggle('curtained', closed);
       toy.lcd.drawBatch(wsFrame, {
-        behind: (ctx, f) => toy.cubeman.cube.drawRoom(ctx, toy.cubeman.cube.currentSceneId, f),
-        sprites: occupants.map((c) => ({
-          skeleton: c.pose(),
-          front: c.sleeping ? (ctx, _f) => zzzOverlay(ctx, c.animFrame) : undefined,
-        })),
+        behind: (ctx, f) => cube.drawRoom(ctx, cube.currentSceneId, f),
+        sprites: closed
+          ? []
+          : occupants.map((c) => ({
+              skeleton: c.pose(),
+              front: c.sleeping ? (ctx, _f) => zzzOverlay(ctx, c.animFrame) : undefined,
+            })),
+        front: closed ? curtainOverlay : undefined,
       });
     }
   },

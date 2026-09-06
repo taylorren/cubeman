@@ -69,7 +69,13 @@ export class LCD {
    */
   drawBatch(
     frame: number,
-    opts: { behind?: Overlay; sprites: Array<{ skeleton: Skeleton; front?: Overlay }> },
+    opts: {
+      behind?: Overlay;
+      sprites: Array<{ skeleton: Skeleton; front?: Overlay }>;
+      /** Full-screen overlay drawn after all sprites (e.g. a curtain over an
+       *  empty, closed cube). Lives in LCD space like the sprite fronts. */
+      front?: Overlay;
+    },
   ): void {
     const { octx, px, ss } = this;
     const size = px * ss;
@@ -123,6 +129,7 @@ export class LCD {
     // front overlays live in full LCD space (post body-scale reset)
     octx.setTransform(ss, 0, 0, ss, 0, 0);
     for (const sprite of opts.sprites) if (sprite.front) sprite.front(octx, frame);
+    if (opts.front) opts.front(octx, frame);
 
     // downsample ss×ss blocks (area average), then threshold to LCD segments.
     // Averaging instead of point-sampling gives smooth pixel coverage:

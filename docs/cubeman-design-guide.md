@@ -247,7 +247,7 @@ object. The split keeps character state and world state evolving separately:
 - **`Cubeman`** (`src/game/cubeman.ts`) — one per character. Owns animation
   mode, position (`x`), stamina, timers, sleep, and the `home` cube. Its
   *current* cube is tracked separately from `home`, so visiting never changes
-  ownership. Two `Cubeman` instances (Slick & Pip) each use the Stickman
+  ownership. Two `Cubeman` instances (Sticko & Pip) each use the Stickman
   profession for now.
 - **`Cube`** (`src/game/cube.ts`) — one per toy. Owns rooms and props: the
   ball belongs to the living room and rolls even when the cube is empty. The
@@ -256,31 +256,30 @@ object. The split keeps character state and world state evolving separately:
   between cubes are **derived from slot adjacency** (slot `i` ↔ `i±1`), never
   from scene-array ordering. `neighborOf(cube, dir)` resolves a `neighbor`
   exit to a specific cube; when the adjacent slot is empty it's a wall. A
-  cube is home to one resident plus **at most one visitor**.
+  cube is home to one resident plus **at most one visitor**, and is **closed**
+  (curtained) while its resident is away.
 - **`Stamina`** (`src/game/stamina.ts`) — per-cubeman energy (see above).
 - **Rendering** (`src/render/lcd.ts`, `src/main.ts`) — `LCD.drawBatch`
   composites several skeletons over one shared backdrop: a cube's display
   draws its current room, then **every** cubeman standing in it (resident +
-  visitor, i.e. shared-room occupancy).
+  visitor, i.e. shared-room occupancy). A closed cube draws a curtain instead.
 
-**Autonomous visit** — a first-class cubeman behavior (not a button press):
-from the **home living room** (where the `neighbor` exits live) an idle
-cubeman sometimes crosses a *connected* edge into the neighbor's living room
-(`startVisit`). The visit has three guarantees:
+**Autonomous visit** — a first-class cubeman behavior (not a button press),
+coordinated by `VisitSession` (`src/game/visit.ts`). The simple model:
 
-1. It only fires from home **and** the living room **and** an actually
-   connected edge — otherwise it's a clean no-op (`startVisit` self-guards;
-   `connectedNeighborDir()` returns null when no neighbor is connected).
-2. It respects capacity — `canAcceptVisitor` allows one resident plus one
-   visitor, checked at departure. **Returning home is always allowed**, so a
-   cubeman never gets stranded even if the neighbor is visiting *its* home at
-   the same time.
-3. It is a round trip — after 20–40s (`VISIT_MIN/MAX_MS`) the visitor routes
-   back through the host's hub (`returnHome`) and crosses home; whether it
-   wandered deeper into the host's rooms or not, `returnHome` first returns to
-   the host's hub, then exits. Returns are callback-safe (no deadlocks).
-   **Return-home-before-sleep is explicit**: a visitor that needs to nap or
-   flop always travels home first, then sleeps in its own bed.
+1. **A decides** — from its home living room, an idle cubeman sometimes picks a
+   connected neighbor (`startVisit`). Self-guards: only from home + living room
+   + a connected edge, otherwise a clean no-op.
+2. **Check B is home** (`canAcceptVisitor`) → A disappears from A's cube (which
+   drops a curtain) and appears in B's living room. The session starts: both
+   are marked `inVisit` (A's solo autonomy is suspended, A's buttons go dead),
+   pinned to B's living room, and social beats (chat/wave) fire every 5–9s.
+3. **B not home** → nothing happens; A continues its solo life.
+
+The session ends on a 20–40s timer, or earlier if the visitor is tired (it goes
+home to sleep). **Returning home is always allowed** — a cubeman can never be
+stranded even if the other is visiting its home at the same moment. The visitor
+teleports back to its own living room and the curtain lifts.
 
 Internal room doors (`scene` edges) still use the scene graph within a cube;
 `neighbor` edges and the shelf handle the cross-cube hop, kept distinct from

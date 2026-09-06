@@ -166,6 +166,21 @@ body {
   border-radius: 50%;
 }
 
+/* While a cubeman is away visiting, its cube is closed and curtained, and
+   its own buttons are dead. */
+.slot.curtained .cube {
+  filter: brightness(0.7) saturate(0.8);
+}
+.slot.curtained .btn,
+.btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8) brightness(0.75);
+  box-shadow: 0 1px 0 rgba(0, 0, 30, 0.5);
+}
+.btn:disabled:active {
+  transform: none;
+}
+
 /* --- Right rail: goals + roster ------------------------------------------------ */
 
 .rail {

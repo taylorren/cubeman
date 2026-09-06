@@ -39,6 +39,8 @@ export interface Action {
   id: string;
   name: string;
   anim: Anim;
+  /** Stamina cost — drives autonomous trick selection (default 8). */
+  effort?: number;
 }
 
 /**

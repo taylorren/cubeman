@@ -20,6 +20,7 @@ const crouch = pose({
 const backflip: Action = {
   id: 'backflip',
   name: 'Backflip',
+  effort: 12,
   anim: {
     dur: 30,
     loop: false,
@@ -47,6 +48,7 @@ const spread = pose({
 const cartwheel: Action = {
   id: 'cartwheel',
   name: 'Cartwheel',
+  effort: 10,
   anim: {
     dur: 30,
     loop: false,
@@ -65,6 +67,7 @@ const cartwheel: Action = {
 const cheekyWave: Action = {
   id: 'cheeky-wave',
   name: 'Cheeky Wave',
+  effort: 6,
   anim: {
     dur: 44,
     loop: false,

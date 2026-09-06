@@ -7,6 +7,7 @@ import * as shared from './content/professions/shared';
 import type { Action } from './content/professions';
 import type { Anim } from './render/skeleton';
 import { Achievements } from './game/achievements';
+import { STAMINA, stamina } from './game/stamina';
 
 const FPS = 30;
 const PX = 48;
@@ -39,6 +40,8 @@ let frame = 0;
 let busy = false;
 let lastInteract = performance.now();
 const SLEEP_AFTER_MS = 60_000;
+/** Where this nap is happening — bed naps refill fully, flops partially. */
+let sleptInBed = false;
 
 // --- Position: the cubeman wanders around its cube ---------------------------
 
@@ -93,10 +96,14 @@ function startAction(action: Action, spontaneous = false): void {
   busy = true;
   mode = { anim: action.anim, loop: false, action, onEnd: backToIdle };
   frame = 0;
+  stamina.spend(action.effort ?? 8); // user presses still perform, but cost energy
   if (!spontaneous) lastInteract = performance.now();
   // any ACTUAL action consumes the pending spontaneous slot (user-triggered
-  // ones included) — idling/wandering never postpones it
-  nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
+  // ones included) — idling/wandering never postpones it. Tired cubemen
+  // space their tricks further apart.
+  const slowdown = stamina.get() < STAMINA.TIRED ? STAMINA.TIRED_SLOWDOWN : 1;
+  nextSpontaneous =
+    performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS) * slowdown;
   achievements.record(action.id);
 }
 
@@ -166,11 +173,16 @@ function startWalkTo(cxTarget: number, next: () => void): void {
   };
 }
 
-/** Stroll to a random spot within the walkable range. */
+/** Stroll to a random spot within the walkable range. Tired cubemen stay
+ *  closer to where they are. */
 function startWander(): void {
   scheduleWander(); // re-arm even if we end up staying put
   const [lo, hi] = walkableCx();
-  const target = lo + Math.random() * (hi - lo);
+  let target = lo + Math.random() * (hi - lo);
+  if (stamina.get() < STAMINA.TIRED) {
+    // low energy: short hops only
+    target = Math.min(cx() + 6, Math.max(cx() - 6, target));
+  }
   if (Math.abs(target - cx()) < 3) return; // too close — stay put
   startWalkTo(target, backToIdle);
 }
@@ -181,6 +193,7 @@ function startWander(): void {
 function crossEdge(dir: 'left' | 'right', next: () => void): void {
   const edge = scene()[dir];
   if (edge.kind !== 'scene') return; // neighbor edges activate in P2
+  stamina.spend(STAMINA.COST_CROSS);
   sceneIdx = prof.scenes.findIndex((s) => s.id === edge.id);
   roomLastVisited[scene().id] = performance.now();
   // enter from the opposite side and stroll a few steps inward
@@ -221,6 +234,7 @@ function playBall(): void {
 
 function nudgeBall(): void {
   ball.v = 1.6; // kick it toward the bed side
+  stamina.spend(STAMINA.COST_KICK);
   backToIdle();
 }
 
@@ -230,6 +244,18 @@ function backToIdle(): void {
   frame = 0;
   scheduleWander(); // only wandering re-arms here; the spontaneous
   // deadline set by startAction stays until a real action runs
+}
+
+/** Too tired to walk to the bedroom — lie down right here for a while. */
+function flopAsleep(): void {
+  fallAsleep(false);
+}
+
+/** Wake up from a nap (stamina recovered enough). */
+function wakeFromSleep(): void {
+  busy = true;
+  mode = { anim: shared.wake, loop: false, onEnd: backToIdle };
+  frame = 0;
 }
 
 function perform(action: Action): void {
@@ -245,7 +271,8 @@ function perform(action: Action): void {
   }
 }
 
-function fallAsleep(): void {
+function fallAsleep(inBed = false): void {
+  sleptInBed = inBed;
   busy = true;
   mode = {
     anim: shared.sleepEnter,
@@ -386,12 +413,15 @@ const loop = new Loop(
   FPS,
   () => {
     frame++;
+    // sleep is the ONLY recovery channel
+    if (mode.anim === prof.sleep) stamina.regen(STAMINA.REGEN_PER_TICK);
     tickBall();
     // walking: advance x toward the target, stop when arrived
     if (mode.walkTarget !== undefined) {
       const d = mode.walkTarget - x;
       if (Math.abs(d) <= WALK_SPEED) {
         x = mode.walkTarget;
+        stamina.spend(STAMINA.COST_STROLL);
         (mode.onEnd ?? backToIdle)();
       } else {
         x += Math.sign(d) * WALK_SPEED;
@@ -399,29 +429,51 @@ const loop = new Loop(
     }
     if (!mode.loop && mode.walkTarget === undefined && frame >= mode.anim.dur)
       (mode.onEnd ?? backToIdle)();
-    // nap time: travel to the bedroom, walk to the bed, lie down
+    // rested enough? wake up (full tank from bed, partial from a flop)
+    if (
+      mode.anim === prof.sleep &&
+      stamina.get() >= (sleptInBed ? STAMINA.WAKE_FULL : STAMINA.WAKE_NAP)
+    ) {
+      wakeFromSleep();
+      return;
+    }
+    // nap time: exhaustion (even under active play) or being ignored for 60s —
+    // travel to the bedroom, walk to the bed, lie down
     if (
       !busy &&
       mode.anim === prof.idle &&
-      performance.now() - lastInteract > SLEEP_AFTER_MS
+      (stamina.get() < STAMINA.SLEEP_AT ||
+        performance.now() - lastInteract > SLEEP_AFTER_MS)
     ) {
       travelTo('bedroom', () => {
         const spot = scene().sleepSpot;
         if (spot && Math.abs(cx() - spot.cx) > 1.5)
-          startWalkTo(spot.cx, fallAsleep);
-        else fallAsleep();
+          startWalkTo(spot.cx, () => fallAsleep(true));
+        else fallAsleep(true);
       });
       return;
     }
     // spontaneous trick while idle — self-entertainment does NOT reset the
-    // sleep timer (only the user's presses do)
+    // sleep timer (only the user's presses do). Exhausted cubemen skip tricks.
     if (
       !busy &&
       mode.anim === prof.idle &&
+      stamina.get() >= STAMINA.EXHAUSTED &&
       performance.now() >= nextSpontaneous
     ) {
-      const pool = prof.actions;
-      runAction(pool[Math.floor(Math.random() * pool.length)]!, true);
+      // tired cubemen bias toward low-effort tricks
+      const pool =
+        stamina.get() < STAMINA.TIRED
+          ? prof.actions.filter((a) => (a.effort ?? 8) <= 8)
+          : prof.actions;
+      runAction((pool.length ? pool : prof.actions)[
+        Math.floor(Math.random() * (pool.length ? pool.length : prof.actions.length))
+      ]!, true);
+      return;
+    }
+    // too drained even to wander — flop into an in-place nap right here
+    if (!busy && mode.anim === prof.idle && stamina.get() < STAMINA.FLOP_BELOW) {
+      flopAsleep();
       return;
     }
     // wander / kick the ball / explore another room

@@ -109,18 +109,46 @@ Front-of-screen effects (like the sleep "Z z z") use the same `Overlay` type.
 idle ⇄ action₁..ₙ        button press starts action (ignored if busy)
 idle → spontaneous action   every 6–14s in idle, a RANDOM profession action
                             plays on its own, wherever he is standing
-                            (counts toward achievements; does NOT reset sleep timer)
+                            (counts toward achievements; does NOT reset sleep timer;
+                            skipped below EXHAUSTED stamina, biased low-effort when tired)
 idle → walk → idle          every 2.5–6s in idle, he strolls to a random spot
                             (shared `walk` cycle + shiftX; position is persistent;
-                            targets clamp to the room's walkable range around solids)
-idle → sleepEnter → sleep   after 60s without USER interaction he travels to the
-                            bedroom and lies down on its `sleepSpot` (never sleeps
-                            standing wherever he happens to be)
+                            targets clamp to the room's walkable range around solids;
+                            short hops when tired)
+idle → sleepEnter → sleep   after 60s without USER interaction OR stamina < SLEEP_AT,
+                            he travels to the bedroom and lies down on its
+                            `sleepSpot` (never sleeps standing wherever he happens
+                            to be — except a stamina flop, see below)
+sleep → wake                when rested: full tank (bed) or partial (flop), then stretch
 sleep/wake → (stretch) → pressed action     any press wakes
 ```
 
 Modes chain via `onEnd` callbacks (`src/main.ts`) — the same machinery that
 will drive walk-to-edge → cross-cube transitions in P2.
+
+## Stamina (hidden energy budget, `src/game/stamina.ts`)
+
+The cubeman has an invisible 0–100 `stamina` that shapes his **autonomous**
+life. It is never shown as a bar — tiredness is communicated only through
+behavior. **User presses always perform** (and still cost energy); only
+self-directed behavior respects the budget.
+
+- **Spending**: each action costs its `effort` (per-action field, default 8;
+  Stickman: backflip 12, cartwheel 10, wave 6), kicks 5, each completed walk
+  1.5, each room crossing 2.
+- **Recovery**: **sleep is the ONLY recovery channel** (~100 over 50s of sleep).
+  Standing around regenerates nothing. If stamina < SLEEP_AT (40) he goes to
+  bed even under active play; the 60s ignore timer independently sends him to
+  bed too (bored ≠ tired, but both lead to naps).
+- **Tired (<60)**: spontaneous tricks space out ×1.8 and bias to low-effort
+  actions; strolls become short hops.
+- **Exhausted (<30)**: no autonomous tricks at all.
+- **Flop (<10)**: too drained to walk to the bedroom — he lies down *where he
+  is* and naps to ~60, then gets up (and will walk to bed next time).
+- **Waking**: bed sleep ends at a full tank (100), flops at 60.
+
+Tune all thresholds/costs in `STAMINA` (one config object). New professions:
+give each action an `effort` that reflects its spectacle.
 
 **Spontaneity contract**: idle is not static — the cubeman performs a random
 one of its own `actions` every 6–14 seconds. Consequences for content:

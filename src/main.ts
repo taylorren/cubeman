@@ -275,9 +275,30 @@ function backToIdle(): void {
   // deadline set by startAction stays until a real action runs
 }
 
-/** Too tired to walk to the bedroom — lie down right here for a while. */
+/** Too tired to walk to the bedroom — lie down right here for a while.
+ *  The lying pose reaches ~14 author-px to the RIGHT of body center (the
+ *  head), so flopping near the right wall would clip the head off-screen.
+ *  Same stage discipline as actions: slide just enough to the left first. */
+function sleepBand(): [number, number] {
+  const r = Math.max(LCD.LIMB_RADIUS, LCD.HEAD_RADIUS * LCD.BODY_SCALE);
+  const extent = Math.max(
+    animExtent(shared.sleepEnter),
+    animExtent(prof.sleep),
+    animExtent(shared.wake),
+  );
+  const half = 23 - r - LCD.BODY_SCALE * extent;
+  return [Math.max(3, 24 - half), Math.min(45, 24 + half)];
+}
+
 function flopAsleep(): void {
-  fallAsleep(false);
+  const [lo, hi] = sleepBand();
+  if (cx() >= lo && cx() <= hi) {
+    fallAsleep(false);
+    return;
+  }
+  const [wlo, whi] = walkableCx();
+  const target = Math.min(whi, Math.max(wlo, Math.min(hi, Math.max(lo, cx()))));
+  startWalkTo(target, () => fallAsleep(false));
 }
 
 /** Wake up from a nap (stamina recovered enough). Resetting lastInteract
@@ -448,16 +469,15 @@ const loop = new Loop(
     // sleep is the ONLY recovery channel
     if (mode.anim === prof.sleep) stamina.regen(STAMINA.REGEN_PER_TICK);
     tickBall();
-    // walking: advance x toward the target, stop when arrived
+    // walking: advance x toward the target, stop when arrived. Cost is
+    // charged per SCREEN pixel actually moved (author px × BODY_SCALE),
+    // including the final (possibly shorter) arrival step.
     if (mode.walkTarget !== undefined) {
       const d = mode.walkTarget - x;
-      if (Math.abs(d) <= WALK_SPEED) {
-        x = mode.walkTarget;
-        (mode.onEnd ?? backToIdle)();
-      } else {
-        x += Math.sign(d) * WALK_SPEED;
-        stamina.spend(STAMINA.COST_WALK_PX * WALK_SPEED);
-      }
+      const step = Math.sign(d) * Math.min(Math.abs(d), WALK_SPEED);
+      x += step;
+      stamina.spend(STAMINA.COST_WALK_PX * Math.abs(step) * LCD.BODY_SCALE);
+      if (x === mode.walkTarget) (mode.onEnd ?? backToIdle)();
     }
     if (!mode.loop && mode.walkTarget === undefined && frame >= mode.anim.dur)
       (mode.onEnd ?? backToIdle)();

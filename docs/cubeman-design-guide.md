@@ -113,7 +113,7 @@ idle → spontaneous action   every 6–14s in idle, a RANDOM profession action
 idle → walk → idle          every 2.5–6s in idle, he strolls to a random spot
                             (shared `walk` cycle + shiftX; position is persistent;
                             targets clamp to the room's walkable range around solids)
-idle → sleepEnter → sleep   after 30s without USER interaction he travels to the
+idle → sleepEnter → sleep   after 60s without USER interaction he travels to the
                             bedroom and lies down on its `sleepSpot` (never sleeps
                             standing wherever he happens to be)
 sleep/wake → (stretch) → pressed action     any press wakes
@@ -132,7 +132,7 @@ one of its own `actions` every 6–14 seconds. Consequences for content:
   when nobody clicks.
 - Auto-sleep still wins if the user walks away: **spontaneous actions do not
   reset the sleep timer** (only real user presses do), so an ignored cubeman
-  still dozes off after 30s. Tune `SLEEP_AFTER_MS` / `SPONTANEOUS_*_MS` /
+  still dozes off after 60s. Tune `SLEEP_AFTER_MS` / `SPONTANEOUS_*_MS` /
   `WANDER_*_MS` in `main.ts`, not the animations.
 - **Timer independence**: the spontaneous deadline survives any amount of
   wandering/ball-play/room-hopping — only an *actual* action (spontaneous or
@@ -197,4 +197,4 @@ opposite side) — the same handoff P2 uses between cubes.
    read well without user context and express the profession's character.
 4. Register in `index.ts`; wire its unlock into achievements (`game/achievements.ts`).
 5. Check density: nothing important in y 10–40 center band; ground at `GROUND_Y`.
-6. Verify all actions from idle, sleep-entry/wake chaining, and the 30s auto-sleep.
+6. Verify all actions from idle, sleep-entry/wake chaining, and the 60s auto-sleep.

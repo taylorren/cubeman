@@ -38,7 +38,7 @@ let mode: Mode = { anim: prof.idle, loop: true };
 let frame = 0;
 let busy = false;
 let lastInteract = performance.now();
-const SLEEP_AFTER_MS = 30_000;
+const SLEEP_AFTER_MS = 60_000;
 
 // --- Position: the cubeman wanders around its cube ---------------------------
 

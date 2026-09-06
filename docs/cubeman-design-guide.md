@@ -75,7 +75,7 @@ Register new professions in `src/content/professions/index.ts`.
 From `shared.ts`: `idle` (breathe/glance), `sleep` (lying + foot twitch),
 `sleepEnter` (sit → slump → lie), `wake` (lie → sit → stretch).
 Every profession gets them by importing; the state machine auto-sleeps after
-30s idle and chains wake → action on any button press.
+60s idle and chains wake → action on any button press.
 
 ### Actions
 

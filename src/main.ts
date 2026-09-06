@@ -173,17 +173,25 @@ function startWalkTo(cxTarget: number, next: () => void): void {
   };
 }
 
-/** Stroll to a random spot within the walkable range. Tired cubemen stay
- *  closer to where they are. */
+/** Stroll to a random spot within the walkable range. Tired cubemen take
+ *  short hops — but if they're somehow outside the walkable range (e.g. woke
+ *  up on the bed spot), reaching valid ground wins over the hop limit. */
 function startWander(): void {
   scheduleWander(); // re-arm even if we end up staying put
   const [lo, hi] = walkableCx();
-  let target = lo + Math.random() * (hi - lo);
-  if (stamina.get() < STAMINA.TIRED) {
-    // low energy: short hops only
-    target = Math.min(cx() + 6, Math.max(cx() - 6, target));
+  const here = cx();
+  let target: number;
+  if (here < lo || here > hi) {
+    // outside walkable range: head for the nearest boundary
+    target = here < lo ? lo : hi;
+  } else {
+    target = lo + Math.random() * (hi - lo);
+    if (stamina.get() < STAMINA.TIRED) {
+      // low energy: short hops only, still clamped into the walkable range
+      target = Math.min(hi, Math.max(lo, Math.min(here + 6, Math.max(here - 6, target))));
+    }
   }
-  if (Math.abs(target - cx()) < 3) return; // too close — stay put
+  if (Math.abs(target - here) < 3) return; // too close — stay put
   startWalkTo(target, backToIdle);
 }
 
@@ -439,6 +447,13 @@ const loop = new Loop(
       wakeFromSleep();
       return;
     }
+    // too drained even to walk to the bedroom? flop into an in-place nap
+    // right here (checked BEFORE ordinary bed routing, which would otherwise
+    // always win — the flop tier would be unreachable)
+    if (!busy && mode.anim === prof.idle && stamina.get() < STAMINA.FLOP_BELOW) {
+      flopAsleep();
+      return;
+    }
     // nap time: exhaustion (even under active play) or being ignored for 60s —
     // travel to the bedroom, walk to the bed, lie down
     if (
@@ -471,11 +486,6 @@ const loop = new Loop(
       runAction((pool.length ? pool : prof.actions)[
         Math.floor(Math.random() * (pool.length ? pool.length : prof.actions.length))
       ]!, true);
-      return;
-    }
-    // too drained even to wander — flop into an in-place nap right here
-    if (!busy && mode.anim === prof.idle && stamina.get() < STAMINA.FLOP_BELOW) {
-      flopAsleep();
       return;
     }
     // wander / kick the ball / explore another room

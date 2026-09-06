@@ -64,7 +64,7 @@ interface Profession {
   actions: Action[];        // 3 for now — profession-specific one-shots
   idle: Anim;               // shared — import from shared.ts
   sleep: Anim;              // shared
-  ambience: Ambience;       // profession-specific home scenery
+  scenes: Scene[];          // rooms of the home cube; first = hub/entry room
 }
 ```
 
@@ -85,10 +85,16 @@ Every profession gets them by importing; the state machine auto-sleeps after
 
 Name actions by their personality, not just mechanics ("Cheeky Wave" > "Wave").
 
-### Ambience
+### Scenes (ambience per room)
 
 ```ts
-interface Ambience { id: string; name: string; draw: Overlay }
+interface Ambience { id: string; name: string; draw: Overlay;
+  sleepSpot?: { x1: number; x2: number; cx: number };  // where he naps
+  solids?: Array<[number, number]>;                    // unwalkable furniture spans
+}
+interface Scene extends Ambience {
+  left: SceneEdge; right: SceneEdge;  // 'scene' | 'neighbor' | 'wall'
+}
 type Overlay = (ctx: CanvasRenderingContext2D, frame: number) => void;
 ```
 
@@ -105,8 +111,11 @@ idle → spontaneous action   every 6–14s in idle, a RANDOM profession action
                             plays on its own, wherever he is standing
                             (counts toward achievements; does NOT reset sleep timer)
 idle → walk → idle          every 2.5–6s in idle, he strolls to a random spot
-                            (shared `walk` cycle + shiftX; position is persistent)
-idle → sleepEnter → sleep   after 30s without USER interaction (any spot)
+                            (shared `walk` cycle + shiftX; position is persistent;
+                            targets clamp to the room's walkable range around solids)
+idle → sleepEnter → sleep   after 30s without USER interaction he travels to the
+                            bedroom and lies down on its `sleepSpot` (never sleeps
+                            standing wherever he happens to be)
 sleep/wake → (stretch) → pressed action     any press wakes
 ```
 
@@ -132,8 +141,8 @@ one of its own `actions` every 6–14 seconds. Consequences for content:
 - **Wandering**: idle alternates between pausing (breathe/glance) and strolling
   to a random spot via the shared `walk` cycle, moved with `shiftX`. All
   position changes happen at render time — poses are authored at x=0 and never
-  hand-shifted. `WANDER_RANGE` (±8 author px) keeps every pose, including the
-  lying sleep pose, safely on screen.
+  hand-shifted. Targets are body-center screen x values clamped to the room's
+  walkable range (`walkableCx()` = 5–43 minus `solids` margins).
 - **Stage discipline**: actions are checked for horizontal reach
   (`animExtent` — max joint |x−24| over keyframes) *plus rendered thickness*
   (limb stroke half-width, head disc — `LCD.LIMB_RADIUS` / `HEAD_RADIUS`) and
@@ -179,8 +188,11 @@ opposite side) — the same handoff P2 uses between cubes.
 
 ## Checklist for a new profession
 
-1. Create `src/content/professions/<id>.ts`: 3 actions + chosen ambience.
-2. Design an **ambience that contrasts** existing ones (night vs day, indoors vs outdoors).
+1. Create `src/content/professions/<id>.ts`: 3 actions + the room scenes
+   (`shared.ts` exports reusable rooms — import `idle`/`sleep` too).
+2. Design **scenes that contrast** existing ones (night vs day, indoors vs
+   outdoors); give the hub the `neighbor` edges for P2, internal rooms `scene`
+   edges; declare `sleepSpot` + `solids` for furniture.
 3. Remember: all 3 actions will fire **spontaneously during idle** — each must
    read well without user context and express the profession's character.
 4. Register in `index.ts`; wire its unlock into achievements (`game/achievements.ts`).

@@ -60,9 +60,13 @@ export class VisitSession {
     visitor.setInVisit(true);
 
     // Seat them at separate spots in the living room: host on the left, the
-    // visitor on the right, so they read as two distinct characters.
+    // visitor on the right, so they read as two distinct characters facing each other.
     host.setPosition(LEFT_SPOT);
     visitor.setPosition(RIGHT_SPOT);
+
+    // Face-to-face greeting: both wave hello as the visit begins.
+    host.playSocial(shared.greeting);
+    visitor.playSocial(shared.greeting);
 
     this.socialAt = now + randRange(SOCIAL_MIN_MS, SOCIAL_MAX_MS);
     this.visitUntil = now + randRange(VISIT_MIN_MS, VISIT_MAX_MS);
@@ -129,9 +133,16 @@ export class VisitSession {
   private playSharedBall(): void {
     const ball = this.host.cube.ball;
     // visitor (right side) kicks left toward the host; host kicks right back
-    ball.v = this.visitor.posX > this.host.posX ? -1.4 : 1.4;
-    this.host.playSocial(shared.wave);
-    this.visitor.playSocial(shared.wave);
+    const visitorKicks = this.visitor.posX > this.host.posX;
+    ball.v = visitorKicks ? -1.4 : 1.4;
+    // Both react: the kicker does a "kick" pose, the receiver waves eagerly
+    if (visitorKicks) {
+      this.visitor.playSocial(shared.kick);
+      this.host.playSocial(shared.wave);
+    } else {
+      this.host.playSocial(shared.kick);
+      this.visitor.playSocial(shared.wave);
+    }
   }
 
   /**

@@ -5,7 +5,8 @@ import * as shared from '../content/professions/shared';
 import type { Action, Profession } from '../content/professions';
 import { GRACE_MS, STAMINA, Stamina } from './stamina';
 import type { Cube } from './cube';
-import type { Shelf } from './shelf';
+import { SHELF_DIRECTIONS } from './shelf';
+import type { Dir, Shelf } from './shelf';
 import { gameLog } from '../core/debug';
 import type { LogDetails } from '../core/debug';
 
@@ -328,15 +329,64 @@ export class Cubeman {
     this.travelTo(others[0]!.id, () => this.backToIdle());
   }
 
-  // --- Visiting a neighboring cube ---------------------------------------------
+    // --- Visiting a neighboring cube --------------------------------------------
+
+  /**
+   * The entry x (in author space) where a cubeman should appear when arriving
+   * at a room's edge from a given direction, plus the exit x where it walks TO
+   * before leaving.
+   *
+   * - left  door: exit at x=3,  enter from x=45 (arrive from the left)
+   * - right door: exit at x=45, enter from x=3  (arrive from the right)
+   * - up/down:    exit at x=24 (ladder center), enter from x=24
+   */
+  private static readonly EXIT_X: Record<Dir, number> = { left: 3, right: 45, up: 24, down: 24 };
+  private static readonly ENTRY_X: Record<Dir, number> = { left: 45, right: 3, up: 24, down: 24 };
+
+      /** Walk toward the neighbor in `dir`, transition cubes, then call `next`.
+   *  For left/right neighbors the cubeman walks to the door, appears on the
+   *  other side, and strolls inward. For up/down, a climb animation plays
+   *  at the ladder before swapping cubes. */
+  private crossCube(dir: Dir, dest: Cube, next: () => void): void {
+    const edgeX = Cubeman.EXIT_X[dir];
+    this.startWalkTo(edgeX, () => {
+      if (dir === 'up' || dir === 'down') {
+        // play the ladder climb before teleporting
+        const climb = dir === 'up' ? shared.climbUp : shared.climbDown;
+        this.busy = true;
+        this.mode = {
+          anim: climb,
+          loop: false,
+          onEnd: () => {
+            const from = this.cube.id;
+            this.cube = dest;
+            this.cube.currentSceneId = dest.hub().id;
+            this.x = Cubeman.ENTRY_X[dir];
+            this.log('cube.cross', { from, to: dest.id, direction: dir });
+            // walk inward to center of the new living room
+            this.startWalkTo(24, () => next());
+          },
+        };
+        this.frame = 0;
+      } else {
+        // simple door step-through: swap cube and walk in from the opposite side
+        const from = this.cube.id;
+        this.cube = dest;
+        this.cube.currentSceneId = dest.hub().id;
+        this.x = Cubeman.ENTRY_X[dir];
+        this.log('cube.cross', { from, to: dest.id, direction: dir });
+        // walk inward toward center from whichever side we entered
+        this.startWalkTo(24, () => next());
+      }
+    });
+  }
 
   /**
    * Autonomous "visit": A decides to visit a connected neighbor B.
-   * Simple model — no animation of crossing:
    *   1. A decides (only from home, in the living room, to a connected cube)
-   *   2. Check B is home (canAcceptVisitor) → A disappears from A's cube and
-   *      appears in B's living room; the coordinator (VisitSession) starts.
-   *   3. Not home → nothing happens, A continues its solo life.
+   *   2. Walk to the appropriate edge, animate the crossing (door or ladder),
+   *      appear in B's living room, then stroll inward
+   *   3. The VisitSession starts from onVisitArrived callback
    */
   private startVisit(): void {
     this.scheduleWander();
@@ -345,9 +395,7 @@ export class Cubeman {
       this.log('visit.rejected', { reason: this.cube !== this.home ? 'not-home' : 'not-in-hub' });
       return;
     }
-    // Resolve the neighbor from the SHELF's slot table — not the room's
-    // scene-graph edge. In a 1×2 layout, cube-0's right neighbor is cube-1
-    // because the shelf says so, regardless of what the room edges declare.
+    // Shelf-grid connections are independent of internal room doors.
     const neighbor = this.visitableNeighbor();
     if (!neighbor) {
       this.log('visit.rejected', { reason: 'no-available-neighbor' });
@@ -362,28 +410,27 @@ export class Cubeman {
       });
       return;
     }
-    const from = this.cube.id;
-    // teleport A into B's living room
-    this.cube = dest;
-    this.cube.currentSceneId = dest.hub().id;
-    this.x = 0; // center of B's living room
-    this.backToIdle();
-    this.log('visit.arrived', { from, direction: dir });
-    this.onVisitArrived?.(this);
+    // Walk to the edge of our living room, cross into the neighbor's cube,
+    // and stroll inward. The onVisitArrived callback starts the VisitSession
+    // once we've fully arrived and are standing in the host's living room.
+    this.crossCube(dir, dest, () => {
+      this.log('visit.arrived', { direction: dir });
+      this.onVisitArrived?.(this);
+    });
   }
 
   /** The adjacent cube (if any) reachable via the shelf's slot table. */
-  private visitableNeighbor(): { dir: 'left' | 'right'; dest: Cube } | null {
-    for (const dir of ['left', 'right'] as const) {
+  private visitableNeighbor(): { dir: Dir; dest: Cube } | null {
+    for (const dir of SHELF_DIRECTIONS) {
       const dest = this.shelf.neighborOf(this.cube, dir);
-      if (dest) return { dir, dest };
+      if (dest && this.shelf.canAcceptVisitor(dest, this)) return { dir, dest };
     }
     return null;
   }
 
-  /** Return home (teleport). Used by the VisitSession when the visit ends:
-   *  the visitor disappears from the host's cube and reappears in its own
-   *  living room. Callback-safe — `next` always runs. */
+    /** Walk to the edge of the current room toward home, cross the cube boundary
+   *  (door or ladder), arrive at the home living room, and walk inward. Then
+   *  run `next`. Used by VisitSession to return the visitor home. */
   private returnHome(next: () => void): void {
     this.log('return.start');
     if (this.cube === this.home) {
@@ -391,12 +438,23 @@ export class Cubeman {
       next();
       return;
     }
-    const from = this.cube.id;
-    this.cube = this.home;
-    this.cube.currentSceneId = this.home.hub().id;
-    this.x = 0;
-    this.log('return.arrived', { from, alreadyHome: false });
-    next();
+    // Determine which direction home is, relative to the current cube.
+    const fromId = this.cube.id;
+    const dir = this.shelf.exitDirection(this.cube, this.home);
+    if (!dir) {
+      // No shelf-level path — fall back to teleport.
+      this.cube = this.home;
+      this.cube.currentSceneId = this.home.hub().id;
+      this.x = 0;
+      this.log('return.arrived', { from: fromId, alreadyHome: false });
+      next();
+      return;
+    }
+    // Walk to the edge, cross, and arrive home.
+    this.crossCube(dir, this.home, () => {
+      this.log('return.arrived', { from: fromId, alreadyHome: false });
+      next();
+    });
   }
 
 
@@ -560,10 +618,11 @@ export class Cubeman {
     this.frame = 0;
   }
 
-  /** Place this cubeman at a specific author-space x and stand idle — the
+    /** Place this cubeman at a specific author-space x and stand idle — the
    *  VisitSession uses this to seat the visitor and host at separate spots. */
   setPosition(x: number): void {
     this.x = x;
+    this.busy = false;
     this.mode = { anim: this.prof.idle, loop: true };
     this.frame = 0;
   }
@@ -602,7 +661,8 @@ export class Cubeman {
   private routeToBed(): void {
     const goToSpot = (): void => {
       const spot = this.scene().sleepSpot;
-      if (spot && Math.abs(this.cx() - spot.cx) > 1.5)
+      // Even a small offset can push the lying head beyond the screen.
+      if (spot && this.x !== this.cxToTarget(spot.cx))
         this.startWalkTo(spot.cx, () => this.fallAsleep(true));
       else this.fallAsleep(true);
     };

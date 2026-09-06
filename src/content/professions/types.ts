@@ -10,7 +10,7 @@ export type Overlay = (ctx: CanvasRenderingContext2D, frame: number) => void;
  */
 export type SceneEdge =
   | { kind: 'scene'; id: string }
-  | { kind: 'neighbor'; dir: 'left' | 'right' }
+  | { kind: 'neighbor'; dir: 'left' | 'right' | 'up' | 'down' }
   | { kind: 'wall' };
 
 /** Scenery drawn behind the cubeman — makes a cube feel like a place. */
@@ -32,6 +32,8 @@ export interface Ambience {
 export interface Scene extends Ambience {
   left: SceneEdge;
   right: SceneEdge;
+  up: SceneEdge;
+  down: SceneEdge;
 }
 
 /** A profession action: a named one-shot animation. */

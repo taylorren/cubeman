@@ -252,12 +252,18 @@ object. The split keeps character state and world state evolving separately:
 - **`Cube`** (`src/game/cube.ts`) — one per toy. Owns rooms and props: the
   ball belongs to the living room and rolls even when the cube is empty. The
   room on display (`currentSceneId`) belongs to the cube, not any one cubeman.
-- **`Shelf`** (`src/game/shelf.ts`) — the ordered row of slots. Connections
-  between cubes are **derived from slot adjacency** (slot `i` ↔ `i±1`), never
-  from scene-array ordering. `neighborOf(cube, dir)` resolves a `neighbor`
-  exit to a specific cube; when the adjacent slot is empty it's a wall. A
+- **`Shelf`** (`src/game/shelf.ts`) — a **2x2 row-major grid**: slots 0 and 1
+  form the top row, slots 2 and 3 the bottom row. Connections are derived
+  from grid adjacency, never scene-array ordering: left/right stay within
+  the same row; up/down move by `columns` slots. No diagonal connections or
+  wrapping across row boundaries are allowed. `neighborOf(cube, dir)` returns
+  a cube only when that adjacent slot is occupied. Visits consider all four
+  directions and skip destinations that cannot accept a visitor. A
   cube is home to one resident plus **at most one visitor**, and is **closed**
   (curtained) while its resident is away.
+  `Shelf.columns` drives both neighbor lookup and the CSS column count.
+  To expand the layout later, change the column count and provide the
+  corresponding slots; internal room doors remain left/right-only.
 - **`Stamina`** (`src/game/stamina.ts`) — per-cubeman energy (see above).
 - **Rendering** (`src/render/lcd.ts`, `src/main.ts`) — `LCD.drawBatch`
   composites several skeletons over one shared backdrop: a cube's display

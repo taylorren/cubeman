@@ -10,44 +10,46 @@ import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
 import { VisitSession } from './game/visit';
 import { gameLog } from './core/debug';
+import { loadPlacement, savePlacement } from './game/placement-storage';
 
 const FPS = 30;
 const PX = 48;
 const SCALE = 7;
 
-const prof = professions.stickman;
 gameLog.setEnabled(new URLSearchParams(window.location.search).get('debug') !== '0');
 
-// --- World: two cubes on the shelf --------------------------------------------
-
-// Each toy is its own little world: rooms, scenery and props belong to the
-// CUBE; the characters living in them are separate Cubeman runtimes. Both
-// cubes use the Stickman profession content for now.
-const cubeA = new Cube('cube-0', prof);
-const cubeB = new Cube('cube-1', prof);
-
+type ResidentDefinition = { id: string; name: string; professionId: string; unlock?: string };
+const definitions: ResidentDefinition[] = [
+  { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
+  { id: 'cube-1', name: 'Pip', professionId: 'stickman' },
+  { id: 'cube-2', name: 'Riff', professionId: 'dancer', unlock: 'warmed-up' },
+];
 const cubemen: Cubeman[] = [];
-// Slots 0 and 1 are occupied and horizontally adjacent → connected.
-// Empty slots stay unconnected: their neighbor exits behave as walls.
-const shelf = new Shelf([cubeA, cubeB, null, null], cubemen);
-
-// --- App-level progression (shared by all cubemen) -----------------------------
-
+const cubesById = new Map<string, Cube>();
+const shelf = new Shelf([null, null, null, null], cubemen);
+const shelfEl = document.getElementById('shelf')!;
+shelfEl.style.setProperty('--shelf-n', String(shelf.columns));
+const slots = [...shelfEl.querySelectorAll<HTMLElement>('.slot[data-slot]')];
+const goalsEl = document.getElementById('goals')!;
+const rosterEl = document.getElementById('roster')!;
+const statusEl = document.getElementById('shelf-status')!;
 const banner = document.getElementById('banner')!;
 let bannerTimer: ReturnType<typeof setTimeout> | undefined;
+let selectedCube: Cube | null = null;
+let placingCube: Cube | null = null;
 
 const achievements = new Achievements((a) => {
   banner.textContent = `🏆 Achievement unlocked — ${a.name}: ${a.desc}`;
   banner.hidden = false;
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => (banner.hidden = true), 3500);
+  ensureUnlockedCubemen();
   renderGoals();
+  renderRoster();
 });
 
-/** Active visits — the coordinator owning each togetherness. */
 const visits: VisitSession[] = [];
 
-/** Run the visit once A has crossed into B's living room as a visitor. */
 function beginVisit(visitor: Cubeman): void {
   const host = cubemen.find((c) => c.home === visitor.cube && c !== visitor);
   if (!host) {
@@ -66,24 +68,24 @@ function beginVisit(visitor: Cubeman): void {
   visits.push(new VisitSession(host, visitor, performance.now()));
 }
 
-cubemen.push(
-  new Cubeman({
-    name: 'Sticko',
-    profession: prof,
-    home: cubeA,
-    shelf,
-    onAction: (a) => achievements.record(a.id),
-    onVisitArrived: beginVisit,
-  }),
-  new Cubeman({
-    name: 'Pip',
-    profession: prof,
-    home: cubeB,
-    shelf,
-    onAction: (a) => achievements.record(a.id),
-    onVisitArrived: beginVisit,
-  }),
-);
+function ensureUnlockedCubemen(): void {
+  for (const definition of definitions) {
+    if (cubesById.has(definition.id) ||
+        (definition.unlock && !achievements.isUnlocked(definition.unlock))) continue;
+    const profession = professions[definition.professionId];
+    if (!profession) throw new Error(`Unknown profession: ${definition.professionId}`);
+    const cube = new Cube(definition.id, profession);
+    cubesById.set(cube.id, cube);
+    cubemen.push(new Cubeman({
+      name: definition.name,
+      profession,
+      home: cube,
+      shelf,
+      onAction: (action) => achievements.record(action.id),
+      onVisitArrived: beginVisit,
+    }));
+  }
+}
 
 const debugControls = {
   enable(): void {
@@ -98,8 +100,9 @@ const debugControls = {
   status: () => gameLog.status(),
   flush: () => gameLog.flush(),
   snapshot: () => ({
-    cubemen: cubemen.map((c) => c.debugState()),
+    cubemen: cubemen.map((c) => ({ ...c.debugState(), slot: shelf.slotOf(c.home) })),
     visits: visits.map((v) => v.debugState()),
+    layout: shelf.slots.map((cube) => cube?.id ?? null),
   }),
 };
 
@@ -113,28 +116,87 @@ document.addEventListener('visibilitychange', () => {
   gameLog.record('page.visibility', { state: document.visibilityState });
 });
 
-// --- Shell: per-cube rendering surfaces and scoped controls ------------------
+// Rendering surfaces belong to cubes, not slots: moving a toy never rebinds
+// its buttons, resets its character, or swaps another resident's canvas.
+type Toy = { element: HTMLElement; lcd: LCD; buttons: HTMLButtonElement[] };
+const toys = new Map<Cube, Toy>();
 
-type Toy = { slot: HTMLElement; cubeman: Cubeman; lcd: LCD; buttons: HTMLButtonElement[] };
-
-// Each cube gets its own rendering surface. Its cubeman is the resident;
-// visitors render onto the SAME surface (shared-room occupancy).
-const toys: Toy[] = cubemen.map((cubeman, i) => {
-  const slot = document.querySelector<HTMLElement>(`.slot[data-slot="${i}"]`)!;
-  const canvas = slot.querySelector('canvas')!;
-  const buttons = [...slot.querySelectorAll<HTMLButtonElement>('button[data-action]')];
-  return { slot, cubeman, lcd: new LCD(canvas, PX, SCALE), buttons };
-});
-
-let selected = 0;
-
-function selectSlot(i: number): void {
-  selected = i;
-  for (const toy of toys) toy.slot.classList.toggle('selected', toy.slot === toys[i]!.slot);
+function resident(cube: Cube): Cubeman {
+  const cubeman = shelf.residentOf(cube);
+  if (!cubeman) throw new Error(`Cube ${cube.id} has no resident.`);
+  return cubeman;
 }
 
-toys.forEach((toy, i) => toy.slot.addEventListener('click', () => selectSlot(i)));
-selectSlot(0);
+function setStatus(message: string): void {
+  statusEl.textContent = message;
+}
+
+function updateSelection(): void {
+  slots.forEach((slot, i) => {
+    const cube = shelf.slots[i];
+    slot.classList.toggle('selected', cube !== null && cube === selectedCube);
+    slot.classList.toggle('placement-target', placingCube !== null);
+  });
+  document.getElementById('cancel-placement')!.hidden = placingCube === null;
+}
+
+function selectCube(cube: Cube): void {
+  selectedCube = cube;
+  updateSelection();
+}
+
+function cancelPlacement(): void {
+  placingCube = null;
+  updateSelection();
+  setStatus('Choose Move or Place in the roster to arrange the shelf.');
+}
+
+function startPlacement(cube: Cube): boolean {
+  if (!shelf.canRearrange(cube)) {
+    setStatus('Wait until the visit ends before moving this cube.');
+    return false;
+  }
+  placingCube = cube;
+  updateSelection();
+  setStatus(shelf.slotOf(cube) < 0
+    ? `Choose an empty slot for ${resident(cube).name}. Escape cancels.`
+    : `Choose a slot for ${resident(cube).name}; occupied slots swap. Escape cancels.`);
+  return true;
+}
+
+function finishPlacement(cube: Cube): void {
+  placingCube = null;
+  selectedCube = shelf.slotOf(cube) >= 0 ? cube : shelf.cubes()[0] ?? null;
+  const warning = savePlacement(shelf.slots.map((c) => c?.id ?? null));
+  renderShelf();
+  renderRoster();
+  setStatus(warning ?? 'Shelf saved. Adjacent cubes can visit; diagonal cubes are not connected.');
+}
+
+function chooseSlot(index: number): void {
+  if (placingCube) {
+    const cube = placingCube;
+    const result = shelf.place(cube, index);
+    if (!result.ok) {
+      setStatus(result.reason);
+      return;
+    }
+    finishPlacement(cube);
+  } else {
+    const cube = shelf.slots[index];
+    if (cube) selectCube(cube);
+    else setStatus('Drag a cube here or use the roster to place one.');
+  }
+}
+
+function storeCube(cube: Cube): void {
+  const result = shelf.store(cube);
+  if (!result.ok) {
+    setStatus(result.reason);
+    return;
+  }
+  finishPlacement(cube);
+}
 
 function triggerFor(cubeman: Cubeman, spec: string): void {
   if (spec === 'random') {
@@ -146,26 +208,114 @@ function triggerFor(cubeman: Cubeman, spec: string): void {
   if (action) cubeman.press(action);
 }
 
-// Buttons are scoped to their own cube; keys act on the SELECTED cube.
-for (const b of document.querySelectorAll<HTMLButtonElement>('button[data-action]')) {
-  const toy = toys[Number(b.dataset.cube)]!;
-  b.addEventListener('click', () => triggerFor(toy.cubeman, b.dataset.action!));
+function toyFor(cube: Cube): Toy {
+  const existing = toys.get(cube);
+  if (existing) return existing;
+  const cubeman = resident(cube);
+  const element = document.createElement('div');
+  element.className = `cube cube-${cube.prof.id}`;
+  const bezel = document.createElement('div');
+  bezel.className = 'bezel';
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('aria-label', `${cubeman.name}'s LCD world`);
+  bezel.append(canvas);
+  const controls = document.createElement('div');
+  controls.className = 'buttons';
+  const buttons: HTMLButtonElement[] = [];
+  const actions = [
+    ...cube.prof.actions.map((action, i) => ({ spec: String(i), label: String(i + 1), name: action.name })),
+    { spec: 'random', label: '★', name: 'Surprise' },
+  ];
+  for (const action of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn' + (action.spec === 'random' ? ' btn-star' : '');
+    button.textContent = action.label;
+    button.dataset.action = action.spec;
+    button.title = action.name;
+    button.setAttribute('aria-label', `${cubeman.name}: ${action.name}`);
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      selectCube(cube);
+      triggerFor(cubeman, action.spec);
+    });
+    buttons.push(button);
+    controls.append(button);
+  }
+  element.append(bezel, controls);
+  const toy = { element, lcd: new LCD(canvas, PX, SCALE), buttons };
+  toys.set(cube, toy);
+  return toy;
 }
+
+function renderShelf(): void {
+  slots.forEach((slot, i) => {
+    const cube = shelf.slots[i];
+    slot.classList.toggle('slot-empty', cube === null);
+    slot.classList.remove('curtained', 'drag-over');
+    if (cube) {
+      slot.replaceChildren(toyFor(cube).element);
+      // Enable drag-and-drop for rearranging cubes
+      slot.draggable = true;
+      slot.dataset.slotIndex = String(i);
+    } else {
+      slot.replaceChildren();
+      slot.draggable = false;
+    }
+  });
+  updateSelection();
+}
+
+slots.forEach((slot, index) => {
+  slot.addEventListener('click', () => chooseSlot(index));
+  // Drag-and-drop for rearranging cubes on the shelf
+  slot.addEventListener('dragstart', (event) => {
+    const cube = shelf.slots[index];
+    if (!cube || !shelf.canRearrange(cube)) {
+      event.preventDefault();
+      return;
+    }
+    startPlacement(cube);
+    event.dataTransfer?.setData('text/plain', String(index));
+    event.dataTransfer!.effectAllowed = 'move';
+  });
+  slot.addEventListener('dragover', (event) => {
+    if (!placingCube) return;
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'move';
+    slot.classList.add('drag-over');
+  });
+  slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+  slot.addEventListener('drop', (event) => {
+    event.preventDefault();
+    slot.classList.remove('drag-over');
+    if (placingCube) chooseSlot(index);
+  });
+  slot.addEventListener('dragend', () => {
+    for (const slotEl of slots) slotEl.classList.remove('drag-over');
+  });
+});
+document.getElementById('cancel-placement')!.addEventListener('click', cancelPlacement);
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab') {
+  if (e.key === 'Escape' && placingCube) {
     e.preventDefault();
-    selectSlot((selected + 1) % toys.length);
+    cancelPlacement();
     return;
   }
-  const toy = toys[selected]!;
-  const n = toy.cubeman.prof.actions.length;
-  if (e.key >= '1' && e.key <= String(n)) triggerFor(toy.cubeman, String(Number(e.key) - 1));
-  if (e.key === '0' || e.key === '*') triggerFor(toy.cubeman, 'random');
+  if (e.ctrlKey || e.metaKey || e.altKey ||
+      (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+  const spec = e.key === '0' || e.key === '*' ? 'random' :
+    /^[1-9]$/.test(e.key) ? String(Number(e.key) - 1) : null;
+  if (spec === null) return;
+  if (!selectedCube) {
+    setStatus('Place and select a cube first.');
+    return;
+  }
+  triggerFor(resident(selectedCube), spec);
 });
 
 // --- Shell panels: goals + roster ---------------------------------------------
-
-const goalsEl = document.getElementById('goals')!;
 
 function renderGoals(): void {
   goalsEl.replaceChildren(
@@ -174,7 +324,8 @@ function renderGoals(): void {
       li.className = 'goal' + (a.done ? ' done' : '');
       const state = document.createElement('span');
       state.className = 'goal-state';
-      state.textContent = '✓';
+      state.textContent = a.done ? '✓' : '';
+      state.setAttribute('aria-label', a.done ? 'Completed' : 'Not completed');
       const box = document.createElement('span');
       const name = document.createElement('div');
       name.className = 'goal-name';
@@ -188,47 +339,96 @@ function renderGoals(): void {
     }),
   );
 }
-renderGoals();
 
-// Roster: placed/unlocked/locked professions. Locked entries are mystery
-// silhouettes; unlocked-but-unplaced ones become draggable in a later phase.
-const rosterEl = document.getElementById('roster')!;
-const roster: Array<{ id: string; name: string; note: string }> = [
-  { id: 'stickman', name: 'Stickman', note: 'on the shelf' },
-  { id: 'stickman-2', name: 'Stickman', note: 'on the shelf' },
-  { id: 'mystery-1', name: '???', note: 'keep playing to unlock' },
-  { id: 'mystery-2', name: '???', note: 'keep playing to unlock' },
-];
-for (const c of roster) {
-  const li = document.createElement('li');
-  const locked = c.id.startsWith('mystery');
-  li.className = 'chip' + (locked ? ' chip-locked' : '');
-  // Avatar: a real LCD-rendered portrait of the cubeman's standing pose
-  // (locked entries stay mystery placeholders).
-  let face: HTMLElement;
-  if (locked) {
-    const span = document.createElement('span');
-    span.className = 'chip-face';
-    span.textContent = '?';
-    face = span;
-  } else {
-    const cv = document.createElement('canvas');
-    cv.className = 'chip-face';
-    cv.title = c.name;
-    new LCD(cv, 48, 1).draw(sample(prof.idle, 0), 0, {});
-    face = cv;
+function renderRoster(): void {
+  rosterEl.replaceChildren();
+  for (const definition of definitions) {
+    const cube = cubesById.get(definition.id);
+    const profession = professions[definition.professionId]!;
+    const li = document.createElement('li');
+    li.className = 'chip' + (cube ? '' : ' chip-locked');
+    let face: HTMLElement;
+    if (cube) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'chip-face';
+      new LCD(canvas, 48, 1).draw(sample(profession.idle, 0), 0);
+      face = canvas;
+    } else {
+      face = document.createElement('span');
+      face.className = 'chip-face';
+      face.textContent = '?';
+    }
+    const box = document.createElement('div');
+    box.className = 'chip-details';
+    const name = document.createElement('div');
+    name.className = 'chip-name';
+    name.textContent = `${definition.name} · ${profession.name}`;
+    const note = document.createElement('div');
+    note.className = 'chip-note';
+    const slot = cube ? shelf.slotOf(cube) : -1;
+    note.textContent = !cube ? 'Unlock Warming Up: perform 10 actions' :
+      slot >= 0 ? `Slot ${slot + 1}` : 'Stored · place on an empty slot to play';
+    box.append(name, note);
+    if (cube) {
+      const actions = document.createElement('div');
+      actions.className = 'placement-actions';
+      const move = document.createElement('button');
+      move.type = 'button';
+      move.className = 'placement-control';
+      move.textContent = slot >= 0 ? 'Move' : 'Place';
+      move.dataset.placementCube = cube.id;
+      move.setAttribute('aria-label', `${slot >= 0 ? 'Move' : 'Place'} ${definition.name}`);
+      move.addEventListener('click', () => startPlacement(cube));
+      actions.append(move);
+      if (slot >= 0) {
+        const store = document.createElement('button');
+        store.type = 'button';
+        store.className = 'placement-control';
+        store.textContent = 'Store';
+        store.dataset.placementCube = cube.id;
+        store.setAttribute('aria-label', `Store ${definition.name}`);
+        store.addEventListener('click', () => storeCube(cube));
+        actions.append(store);
+      }
+      box.append(actions);
+      li.draggable = true;
+      li.addEventListener('dragstart', (event) => {
+        if (!startPlacement(cube)) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer?.setData('text/plain', cube.id);
+      });
+      li.addEventListener('dragend', () => {
+        for (const slotEl of slots) slotEl.classList.remove('drop-target');
+        if (placingCube) cancelPlacement();
+      });
+    }
+    li.append(face, box);
+    rosterEl.append(li);
   }
-  const box = document.createElement('span');
-  const name = document.createElement('div');
-  name.className = 'chip-name';
-  name.textContent = c.name;
-  const note = document.createElement('div');
-  note.className = 'chip-note';
-  note.textContent = c.note;
-  box.append(name, note);
-  li.append(face, box);
-  rosterEl.append(li);
+  updatePlacementAvailability();
 }
+
+function updatePlacementAvailability(): void {
+  for (const button of rosterEl.querySelectorAll<HTMLButtonElement>('button[data-placement-cube]')) {
+    const cube = cubesById.get(button.dataset.placementCube!);
+    button.disabled = !cube || !shelf.canRearrange(cube);
+  }
+}
+
+ensureUnlockedCubemen();
+const saved = loadPlacement(new Set(cubesById.keys()), ['cube-0', 'cube-1', null, null]);
+saved.slots.forEach((id, index) => {
+  if (id === null) return;
+  const result = shelf.place(cubesById.get(id)!, index);
+  if (!result.ok) throw new Error(result.reason);
+});
+selectedCube = shelf.cubes()[0] ?? null;
+renderGoals();
+renderShelf();
+renderRoster();
+setStatus(saved.warning ?? 'Move or drag cubes from the roster to choose which neighbors connect.');
 
 // --- "Z z z" overlay while asleep -------------------------------------------
 
@@ -252,9 +452,9 @@ const zzzOverlay: Overlay = (ctx, frame) => {
 
 const curtainOverlay: Overlay = (ctx) => {
   // A dropped curtain across an empty, closed cube: a rod at the top and
-  // vertical folds hanging down — the "nobody's home" signal.
+  // horizontal folds hanging down — the "nobody's home" signal.
   ctx.fillRect(0, 4, 48, 1); // rod
-  for (let x = 2; x < 47; x += 6) ctx.fillRect(x, 5, 2, 41); // folds
+  for (let y = 7; y < 44; y += 6) ctx.fillRect(2, y, 44, 2); // folds
 };
 
 // --- Loop: ONE loop updates the world and renders every occupied slot -------
@@ -265,12 +465,15 @@ const loop = new Loop(
   () => {
     // worlds evolve even when nobody is home (the ball keeps its roll)
     for (const cube of shelf.cubes()) cube.tick();
-    for (const cubeman of cubemen) cubeman.tick();
+    for (const cubeman of cubemen) {
+      if (shelf.slotOf(cubeman.home) >= 0) cubeman.tick();
+    }
     // advance visits and drop any that have ended (their visitor is
     // returning home on its own now)
     const now = performance.now();
     for (const v of visits) v.tick(now);
     for (let i = visits.length - 1; i >= 0; i--) if (visits[i]!.isEnded) visits.splice(i, 1);
+    updatePlacementAvailability();
   },
   () => {
     wsFrame++;
@@ -278,13 +481,15 @@ const loop = new Loop(
     // standing in that cube — the resident and any visitor share the
     // surface (shared-room occupancy). A cube whose resident is away shows
     // a curtain instead of characters, and its controls go dead.
-    for (const toy of toys) {
-      const cube = toy.cubeman.home;
-      const closed = toy.cubeman.cube !== cube; // resident is out visiting
+    for (const cube of shelf.cubes()) {
+      const toy = toyFor(cube);
+      const cubeman = resident(cube);
+      const slot = slots[shelf.slotOf(cube)]!;
+      const closed = cubeman.cube !== cube; // resident is out visiting
       const occupants = cubemen.filter((c) => c.cube === cube);
       // dead buttons for a visitor; host's stay live
-      for (const b of toy.buttons) b.disabled = toy.cubeman.isVisitor;
-      toy.slot.classList.toggle('curtained', closed);
+      for (const b of toy.buttons) b.disabled = cubeman.isVisitor;
+      slot.classList.toggle('curtained', closed);
       toy.lcd.drawBatch(wsFrame, {
         behind: (ctx, f) => cube.drawRoom(ctx, cube.currentSceneId, f),
         sprites: closed

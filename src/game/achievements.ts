@@ -21,8 +21,20 @@ const LIST: Achievement[] = [
   {
     id: 'warmed-up',
     name: 'Warming Up',
-    desc: 'Perform 10 actions',
+    desc: 'Perform 10 actions — unlocks the Dancer!',
     test: (_c, total) => total >= 10,
+  },
+  {
+    id: 'grace-note',
+    name: 'Grace Note',
+    desc: 'Try every action Dancer knows',
+    test: (c) => !!c['pirouette'] && !!c['moonwalk'] && !!c['jazz-hands'],
+  },
+  {
+    id: 'showstopper',
+    name: 'Showstopper',
+    desc: 'Perform 25 total actions',
+    test: (_c, total) => total >= 25,
   },
 ];
 
@@ -76,6 +88,11 @@ export class Achievements {
       desc: a.desc,
       done: this.unlocked.has(a.id),
     }));
+  }
+
+  /** Check if a specific achievement is unlocked (used for profession gating). */
+  isUnlocked(id: string): boolean {
+    return this.unlocked.has(id);
   }
 
   private persist(): void {

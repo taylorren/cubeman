@@ -15,32 +15,14 @@
     </header>
 
     <main class="app">
-      <section class="shelf-wrap">
+      <section class="shelf-wrap" aria-label="Cube shelf">
+        <div class="shelf-toolbar">
+          <p id="shelf-status" role="status" aria-live="polite"></p>
+          <button id="cancel-placement" class="placement-control" type="button" hidden>Cancel placement</button>
+        </div>
         <div class="shelf" id="shelf">
-          <div class="slot" data-slot="0">
-            <div class="cube" data-cube="0">
-              <div class="bezel">
-                <canvas id="screen-0"></canvas>
-              </div>
-              <div class="buttons">
-                <button class="btn" data-cube="0" data-action="0" aria-label="Action 1"></button>
-                <button class="btn btn-star" data-cube="0" data-action="random" aria-label="Surprise">★</button>
-                <button class="btn" data-cube="0" data-action="2" aria-label="Action 3"></button>
-              </div>
-            </div>
-          </div>
-          <div class="slot" data-slot="1">
-            <div class="cube" data-cube="1">
-              <div class="bezel">
-                <canvas id="screen-1"></canvas>
-              </div>
-              <div class="buttons">
-                <button class="btn" data-cube="1" data-action="0" aria-label="Action 1"></button>
-                <button class="btn btn-star" data-cube="1" data-action="random" aria-label="Surprise">★</button>
-                <button class="btn" data-cube="1" data-action="2" aria-label="Action 3"></button>
-              </div>
-            </div>
-          </div>
+          <div class="slot" data-slot="0"></div>
+          <div class="slot" data-slot="1"></div>
           <div class="slot slot-empty" data-slot="2"></div>
           <div class="slot slot-empty" data-slot="3"></div>
         </div>
@@ -58,9 +40,9 @@
       </aside>
     </main>
 
-    <footer class="hintstrip" id="hint">Click a cube to select it · Tab switches · Buttons act on the selected cubeman — they each live on their own.</footer>
+    <footer class="hintstrip" id="hint">Select a cube · 1–3: tricks · 0: surprise · Move/Place in the roster, then choose a slot · Escape: cancel</footer>
 
-    <div class="banner" id="banner" hidden></div>
+    <div class="banner" id="banner" role="status" aria-live="polite" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

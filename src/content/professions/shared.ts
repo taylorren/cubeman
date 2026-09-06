@@ -149,8 +149,10 @@ function rectOutline(
 export const livingRoom: Scene = {
   id: 'living',
   name: 'Living room',
-  left: { kind: 'neighbor', dir: 'left' }, // future: connected cube
+  left: { kind: 'neighbor', dir: 'left' },
   right: { kind: 'scene', id: 'bedroom' },
+  up: { kind: 'neighbor', dir: 'up' },
+  down: { kind: 'neighbor', dir: 'down' },
   draw(ctx, frame) {
     // floor — the bottom rim of the screen itself
     ctx.fillRect(0, 46, 48, 2);
@@ -203,6 +205,8 @@ export const bedroom: Scene = {
   name: 'Bedroom',
   left: { kind: 'scene', id: 'living' },
   right: { kind: 'scene', id: 'bathroom' },
+  up: { kind: 'wall' },
+  down: { kind: 'wall' },
   sleepSpot: { x1: 27, x2: 46, cx: 35.5 },
   solids: [[27, 46]], // the bed
   draw(ctx, frame) {
@@ -235,6 +239,8 @@ export const bathroom: Scene = {
   name: 'Bathroom',
   left: { kind: 'scene', id: 'bedroom' },
   right: { kind: 'wall' },
+  up: { kind: 'wall' },
+  down: { kind: 'wall' },
   solids: [[26, 46]], // the tub
   draw(ctx, frame) {
     ctx.fillRect(0, 46, 48, 2); // floor
@@ -337,6 +343,135 @@ export const wave: Anim = {
     { t: 10, pose: pose({ eR: [27, 10], hR: [33, 6] }) },
     { t: 15, pose: pose({ eR: [27, 10], hR: [30, 6] }) },
     { t: 20, pose: pose({ eR: [28, 10], hR: [31, 5] }) },
+    { t: 28, pose: pose() },
+  ],
+};
+
+/** Face-to-face greeting: both look at each other, wave, and nod hello. */
+export const greeting: Anim = {
+  dur: 36,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    // look up (toward the other), arm rising
+    {
+      t: 6,
+      pose: pose({
+        head: [25, 8.5], neck: [25, 13.5],
+        eR: [27, 12], hR: [29, 7],
+      }),
+    },
+    // wave sway
+    { t: 12, pose: pose({ eR: [27, 11], hR: [31, 6] }) },
+    { t: 18, pose: pose({ eR: [27, 11], hR: [29, 7] }) },
+    // nod + slight bow
+    {
+      t: 24,
+      pose: pose({
+        head: [24.5, 10], neck: [24.5, 14.5], hip: [24.5, 24.5],
+        eR: [28, 12], hR: [30, 8],
+      }),
+    },
+    { t: 36, pose: pose() },
+  ],
+};
+
+/** A playful kick — one leg swings forward (used during shared ball play). */
+export const kick: Anim = {
+  dur: 24,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    // wind up
+    {
+      t: 5,
+      pose: pose({
+        head: [23.5, 9], neck: [23.5, 14], hip: [23.5, 24],
+        kR: [29, 31], fR: [32, 38],
+      }),
+    },
+    // kick forward
+    {
+      t: 11,
+      pose: pose({
+        head: [23, 8.5], neck: [23, 13.5], hip: [23, 24],
+        kL: [20, 32], fL: [19, 40],
+        kR: [26, 28], fR: [33, 22],
+        eL: [19, 18], hL: [16, 23],
+      }),
+    },
+    // recover
+    {
+      t: 17,
+      pose: pose({
+        head: [23.5, 9], neck: [23.5, 14], hip: [23.5, 24],
+        kR: [28, 32], fR: [29, 40],
+      }),
+    },
+    { t: 24, pose: pose() },
+  ],
+};
+
+// --- Climb (up/down ladder transition) -------------------------------------
+// The cubeman reaches up, pulls up, and steps onto the neighbor cube above
+// (or lowers down to the cube below).
+
+/** Stretch up to grab a ladder rung. */
+export const climbUp: Anim = {
+  dur: 30,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    // reach up
+    {
+      t: 8,
+      pose: pose({
+        head: [24, 6], neck: [24, 11], hip: [24, 24],
+        eL: [18, 9], hL: [15, 6],
+        kL: [20, 33], fL: [19, 40],
+        kR: [27, 33], fR: [29, 40],
+      }),
+    },
+    // pull up onto tiptoes
+    {
+      t: 16,
+      pose: pose({
+        head: [24, 6], neck: [24, 10], hip: [24, 23],
+        eR: [30, 9], hR: [33, 5],
+        kL: [20, 33], fL: [20, 40],
+        kR: [28, 33], fR: [30, 40],
+      }),
+    },
+    { t: 30, pose: pose() },
+  ],
+};
+
+/** Reach down and step off a ladder to the cube below. */
+export const climbDown: Anim = {
+  dur: 28,
+  loop: false,
+  keys: [
+    { t: 0, pose: pose() },
+    // reach down
+    {
+      t: 7,
+      pose: pose({
+        head: [24, 10], neck: [24, 15], hip: [24, 25],
+        eR: [28, 18], hR: [30, 23],
+        kL: [21, 32], fL: [20, 40],
+        kR: [27, 32], fR: [29, 40],
+      }),
+    },
+    // step down
+    {
+      t: 16,
+      pose: pose({
+        head: [24, 9], neck: [24, 14], hip: [24, 25],
+        eR: [29, 18], hR: [31, 22],
+        kL: [20, 33], fL: [19, 40],
+        kR: [28, 33], fR: [30, 40],
+      }),
+    },
     { t: 28, pose: pose() },
   ],
 };

@@ -269,7 +269,64 @@ const achievements = new Achievements((a) => {
   banner.hidden = false;
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => (banner.hidden = true), 3500);
+  renderGoals();
 });
+
+// --- Shell panels: goals + roster ---------------------------------------------
+
+const goalsEl = document.getElementById('goals')!;
+
+function renderGoals(): void {
+  goalsEl.replaceChildren(
+    ...achievements.status().map((a) => {
+      const li = document.createElement('li');
+      li.className = 'goal' + (a.done ? ' done' : '');
+      const state = document.createElement('span');
+      state.className = 'goal-state';
+      state.textContent = '✓';
+      const box = document.createElement('span');
+      const name = document.createElement('div');
+      name.className = 'goal-name';
+      name.textContent = a.name;
+      const desc = document.createElement('div');
+      desc.className = 'goal-desc';
+      desc.textContent = a.desc;
+      box.append(name, desc);
+      li.append(state, box);
+      return li;
+    }),
+  );
+}
+renderGoals();
+
+// Roster: placed/unlocked/locked professions. Locked entries are mystery
+// silhouettes; unlocked-but-unplaced ones become draggable in P2.
+const rosterEl = document.getElementById('roster')!;
+const roster: Array<{ id: string; name: string; note: string }> = [
+  { id: 'stickman', name: 'Stickman', note: 'on the shelf' },
+  { id: 'mystery-1', name: '???', note: 'keep playing to unlock' },
+  { id: 'mystery-2', name: '???', note: 'keep playing to unlock' },
+  { id: 'mystery-3', name: '???', note: 'keep playing to unlock' },
+];
+for (const c of roster) {
+  const li = document.createElement('li');
+  const locked = c.id.startsWith('mystery');
+  li.className = 'chip' + (locked ? ' chip-locked' : '');
+  const face = document.createElement('span');
+  face.className = 'chip-face';
+  if (locked) face.textContent = '?';
+  const box = document.createElement('span');
+  const name = document.createElement('div');
+  name.className = 'chip-name';
+  name.textContent = c.name;
+  const note = document.createElement('div');
+  note.className = 'chip-note';
+  note.textContent = c.note;
+  box.append(name, note);
+  li.append(face, box);
+  rosterEl.append(li);
+}
+
 
 // --- Input -------------------------------------------------------------------
 

@@ -3,21 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Matchman — Cube World Simulator</title>
+    <title>Cubeman — Cube World Simulator</title>
   </head>
   <body>
-    <div class="scene">
-      <div class="cube" id="cube">
-        <div class="bezel">
-          <canvas id="screen"></canvas>
-        </div>
-        <div class="buttons">
-          <button class="btn" data-action="0" aria-label="Action 1"></button>
-          <button class="btn btn-star" data-action="random" aria-label="Surprise">★</button>
-          <button class="btn" data-action="2" aria-label="Action 3"></button>
-        </div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-glyph" aria-hidden="true"></span>
+        <span class="brand-name">CUBEMAN</span>
+        <span class="brand-sub">a tiny LCD world</span>
       </div>
-    </div>
+    </header>
+
+    <main class="app">
+      <section class="shelf-wrap">
+        <div class="shelf" id="shelf">
+          <div class="slot" data-slot="0">
+            <div class="cube" id="cube">
+              <div class="bezel">
+                <canvas id="screen"></canvas>
+              </div>
+              <div class="buttons">
+                <button class="btn" data-action="0" aria-label="Action 1"></button>
+                <button class="btn btn-star" data-action="random" aria-label="Surprise">★</button>
+                <button class="btn" data-action="2" aria-label="Action 3"></button>
+              </div>
+            </div>
+          </div>
+          <div class="slot slot-empty" data-slot="1"></div>
+          <div class="slot slot-empty" data-slot="2"></div>
+          <div class="slot slot-empty" data-slot="3"></div>
+        </div>
+      </section>
+
+      <aside class="rail">
+        <section class="panel">
+          <h2 class="panel-title">Goals</h2>
+          <ul class="goals" id="goals"></ul>
+        </section>
+        <section class="panel">
+          <h2 class="panel-title">Cubemen</h2>
+          <ul class="roster" id="roster"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="hintstrip" id="hint">Press the buttons — your cubeman also lives on his own.</footer>
+
     <div class="banner" id="banner" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

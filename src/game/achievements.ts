@@ -68,6 +68,16 @@ export class Achievements {
     this.persist();
   }
 
+  /** Snapshot for UI panels (goals list). */
+  status(): Array<{ id: string; name: string; desc: string; done: boolean }> {
+    return LIST.map((a) => ({
+      id: a.id,
+      name: a.name,
+      desc: a.desc,
+      done: this.unlocked.has(a.id),
+    }));
+  }
+
   private persist(): void {
     try {
       localStorage.setItem(

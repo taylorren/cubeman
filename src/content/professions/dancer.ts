@@ -1,6 +1,6 @@
 import { pose, rot } from '../../render/skeleton';
-import type { Action, Profession } from './types';
-import { livingRoom, bedroom, bathroom, idle, sleep } from './shared';
+import type { Action, Profession, Scene } from './types';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
 
 // --- Dancer: graceful, expressive, full of rhythm --------------------------
 // Personality: fluid movements, spins, and dramatic poses. The dancer
@@ -166,11 +166,42 @@ const jazzHands: Action = {
   },
 };
 
+/**
+ * Dancer's living room: a little practice studio — a full-length mirror, a
+ * ballet barre, floor tape, and a boombox. Same arrangement as every
+ * profession's hub; Dancer just dresses it as a dance space.
+ */
+const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
+  // floor — the bottom rim of the screen itself
+  ctx.fillRect(0, 46, 48, 2);
+  // marley-floor tape: chevron marks a dancer stands on
+  ctx.fillRect(10, 45, 3, 1);
+  ctx.fillRect(22, 45, 3, 1);
+  ctx.fillRect(34, 45, 3, 1);
+
+  // full-length mirror (top-left) with a highlight streak and a sill
+  rectOutline(ctx, 4, 4, 10, 14);
+  ctx.fillRect(4, 18, 10, 1); // sill
+  ctx.fillRect(7, 5, 1, 12); // reflection shine
+
+  // ballet barre along the left wall: rail + two wall brackets
+  ctx.fillRect(2, 29, 16, 1); // rail
+  ctx.fillRect(3, 29, 1, 5); // bracket
+  ctx.fillRect(15, 29, 1, 5); // bracket
+
+  // boombox on the right: body, speakers, and a little beat indicator
+  ctx.fillRect(38, 43, 9, 4); // body
+  ctx.fillRect(39, 43, 3, 1); ctx.fillRect(44, 43, 2, 1); // tweeters
+  ctx.fillRect(39, 45, 3, 2); ctx.fillRect(44, 45, 2, 2); // woofers
+  const beat = Math.floor(frame / 15) % 2;
+  if (beat) ctx.fillRect(41, 42, 2, 1); // flashing LED
+});
+
 export const dancer: Profession = {
   id: 'dancer',
   name: 'Dancer',
-  actions: [pirouette, moonwalk, jazzHands],
+  actions: [pirouette, moonwalk, jazzHands, shower, bath],
   idle,
   sleep,
-  scenes: [livingRoom, bedroom, bathroom],
+  scenes: [livingRoom, bedroom, bathroom], // first = hub/entry room
 };

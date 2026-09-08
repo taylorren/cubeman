@@ -43,6 +43,10 @@ export interface Action {
   anim: Anim;
   /** Stamina cost — drives autonomous trick selection (default 8). */
   effort?: number;
+  /** Restrict the action to a specific room (a scene id in the profession's
+   *  home cube), e.g. `'bathroom'` for shower/bath. Outside that room the
+   *  action is ignored — it "only happens" there. */
+  room?: string;
 }
 
 /**

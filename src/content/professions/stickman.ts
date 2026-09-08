@@ -1,6 +1,6 @@
 import { pose, rot } from '../../render/skeleton';
-import type { Action, Profession } from './types';
-import { livingRoom, bedroom, bathroom, idle, sleep } from './shared';
+import type { Action, Profession, Scene } from './types';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
 
 // --- Actions (3 for now — the array is the extension point) ----------------
 
@@ -134,10 +134,48 @@ const cheekyWave: Action = {
   },
 };
 
+/**
+ * Stickman's living room: a cozy front room with a window (pulsing sun), a
+ * swaying potted plant, and the ball he kicks around. Same arrangement as
+ * every profession's hub — Stickman just makes it his own.
+ */
+const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
+  // floor — the bottom rim of the screen itself
+  ctx.fillRect(0, 46, 48, 2);
+  // grass tufts poking above the floor
+  ctx.fillRect(8, 45, 2, 1);
+  ctx.fillRect(14, 45, 1, 1);
+  ctx.fillRect(20, 45, 2, 1);
+  ctx.fillRect(38, 45, 2, 1);
+
+  // window (top-left)
+  rectOutline(ctx, 5, 5, 11, 9);
+  ctx.fillRect(10, 5, 1, 9); // vertical pane divider
+
+  // sun in the left pane, gently pulsing
+  const pulse = Math.floor(frame / 45) % 2;
+  ctx.fillRect(6, 7, 2, 2);
+  if (pulse) {
+    ctx.fillRect(7, 6, 1, 1); // ray top
+    ctx.fillRect(7, 9, 1, 1); // ray bottom
+    ctx.fillRect(5, 8, 1, 1); // ray left
+    ctx.fillRect(8, 8, 1, 1); // ray right
+  }
+
+  // potted plant (bottom-left corner), stem sways gently
+  const sway = Math.floor(frame / 45) % 2;
+  ctx.fillRect(1, 42, 4, 4); // pot
+  ctx.fillRect(0, 41, 6, 1); // pot rim
+  ctx.fillRect(2 + sway, 36, 1, 5); // stem
+  ctx.fillRect(0 + sway, 35, 2, 2); // left leaf
+  ctx.fillRect(3 + sway, 35, 2, 2); // right leaf
+  ctx.fillRect(1 + sway, 33, 2, 2); // top leaf
+});
+
 export const stickman: Profession = {
   id: 'stickman',
   name: 'Stickman',
-  actions: [backflip, cartwheel, cheekyWave], // ← add new actions here to expand
+  actions: [backflip, cartwheel, cheekyWave, shower, bath], // ← add new actions here to expand
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom], // first = hub/entry room

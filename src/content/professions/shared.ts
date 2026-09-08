@@ -1,4 +1,4 @@
-import type { Scene } from './types';
+import type { Action, Scene } from './types';
 import type { Anim } from '../../render/skeleton';
 import { pose } from '../../render/skeleton';
 
@@ -127,7 +127,7 @@ export const sleepEnter: Anim = {
 };
 
 /** Outline of a rect from fillRects (no stroke state to manage). */
-function rectOutline(
+export function rectOutline(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -141,51 +141,24 @@ function rectOutline(
 }
 
 /**
- * "Living room" — the hub room of the Stickman's cube: window with a
- * pulsing sun, a swaying potted plant, and the ball he kicks around.
- * Its OUTER edges lead to neighbor cubes (declared for P2); the right
- * edge is the door to the bedroom.
+ * The SHARED living-room arrangement. Every profession's hub room has the
+ * same id and the same edges — same toy layout, same way to reach the
+ * bedroom and neighbor cubes — but each profession supplies its OWN ambience
+ * draw, so the room reads differently (Stickman: cozy window & plant;
+ * Dancer: a little studio), while the underlying arrangement never changes.
+ * Pass the profession's draw and you get a Scene with the fixed topology.
  */
-export const livingRoom: Scene = {
-  id: 'living',
-  name: 'Living room',
-  left: { kind: 'neighbor', dir: 'left' },
-  right: { kind: 'scene', id: 'bedroom' },
-  up: { kind: 'neighbor', dir: 'up' },
-  down: { kind: 'neighbor', dir: 'down' },
-  draw(ctx, frame) {
-    // floor — the bottom rim of the screen itself
-    ctx.fillRect(0, 46, 48, 2);
-    // grass tufts poking above the floor
-    ctx.fillRect(8, 45, 2, 1);
-    ctx.fillRect(14, 45, 1, 1);
-    ctx.fillRect(20, 45, 2, 1);
-    ctx.fillRect(38, 45, 2, 1);
-
-    // window (top-left)
-    rectOutline(ctx, 5, 5, 11, 9);
-    ctx.fillRect(10, 5, 1, 9); // vertical pane divider
-
-    // sun in the left pane, gently pulsing
-    const pulse = Math.floor(frame / 45) % 2;
-    ctx.fillRect(6, 7, 2, 2);
-    if (pulse) {
-      ctx.fillRect(7, 6, 1, 1); // ray top
-      ctx.fillRect(7, 9, 1, 1); // ray bottom
-      ctx.fillRect(5, 8, 1, 1); // ray left
-      ctx.fillRect(8, 8, 1, 1); // ray right
-    }
-
-    // potted plant (bottom-left corner), stem sways gently
-    const sway = Math.floor(frame / 45) % 2;
-    ctx.fillRect(1, 42, 4, 4); // pot
-    ctx.fillRect(0, 41, 6, 1); // pot rim
-    ctx.fillRect(2 + sway, 36, 1, 5); // stem
-    ctx.fillRect(0 + sway, 35, 2, 2); // left leaf
-    ctx.fillRect(3 + sway, 35, 2, 2); // right leaf
-    ctx.fillRect(1 + sway, 33, 2, 2); // top leaf
-  },
-};
+export function makeLivingRoom(draw: Scene['draw']): Scene {
+  return {
+    id: 'living',
+    name: 'Living room',
+    left: { kind: 'neighbor', dir: 'left' },
+    right: { kind: 'scene', id: 'bedroom' },
+    up: { kind: 'neighbor', dir: 'up' },
+    down: { kind: 'neighbor', dir: 'down' },
+    draw,
+  };
+}
 
 /** The stickman portrait that hangs in the bedroom. */
 function portrait(ctx: CanvasRenderingContext2D, x: number, y: number): void {
@@ -295,6 +268,128 @@ export const wake: Anim = {
     },
     { t: 30, pose: pose() },
   ],
+};
+
+// --- Bathroom actions: shower & bath -----------------------------------------
+// Shared by every profession (there's a bathroom in every cube). Both are
+// room-locked: they only run in the bathroom (see `room` on Action) — pressing
+// them elsewhere is a no-op, so the toy "showers" only in the tub.
+
+/** Standing under running water: arms raised, gentle bobbing and drip. */
+export const shower: Action = {
+  id: 'shower',
+  name: 'Shower',
+  effort: 4,
+  room: 'bathroom',
+  anim: {
+    dur: 48,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // reach up, then stay under the stream with a little sway
+      {
+        t: 4,
+        pose: pose({
+          head: [24, 6], neck: [24, 11],
+          eL: [19, 9], hL: [15, 3], eR: [29, 9], hR: [33, 3],
+        }),
+      },
+      {
+        t: 12,
+        pose: pose({
+          head: [24, 5.6], neck: [24, 10.6],
+          eL: [19, 9], hL: [14, 2], eR: [29, 9], hR: [34, 2],
+        }),
+      },
+      {
+        t: 20,
+        pose: pose({
+          head: [24, 6], neck: [24, 11],
+          eL: [19, 9], hL: [15, 3], eR: [29, 9], hR: [33, 3],
+        }),
+      },
+      {
+        t: 28,
+        pose: pose({
+          head: [24.4, 5.8], neck: [24.4, 10.8],
+          eL: [19, 9], hL: [15, 3], eR: [29, 9], hR: [33, 3],
+        }),
+      },
+      {
+        t: 36,
+        pose: pose({
+          head: [24, 5.5], neck: [24, 10.5],
+          eL: [19, 9], hL: [14, 2], eR: [29, 9], hR: [34, 2],
+        }),
+      },
+      {
+        t: 42,
+        pose: pose({
+          head: [24, 7], neck: [24, 12],
+          eL: [19, 11], hL: [15, 6], eR: [29, 11], hR: [33, 6],
+        }),
+      },
+      { t: 48, pose: pose() },
+    ],
+  },
+};
+
+/** Sitting in the tub: splash, then settle with a happy drip. */
+export const bath: Action = {
+  id: 'bath',
+  name: 'Bath',
+  effort: 3,
+  room: 'bathroom',
+  anim: {
+    dur: 40,
+    loop: false,
+    keys: [
+      // climb into the tub and sit
+      {
+        t: 0,
+        pose: pose({
+          head: [24, 13], neck: [24, 18], hip: [24, 27],
+          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+        }),
+      },
+      {
+        t: 8,
+        pose: pose({
+          head: [24, 12], neck: [24, 17], hip: [24, 28],
+          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+          eL: [18, 16], hL: [14, 12], eR: [30, 16], hR: [34, 12],
+        }),
+      },
+      // splash down
+      {
+        t: 16,
+        pose: pose({
+          head: [24, 12.5], neck: [24, 17.5], hip: [24, 28],
+          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+          eL: [17, 20], hL: [13, 26], eR: [31, 20], hR: [35, 26],
+        }),
+      },
+      // splash up again
+      {
+        t: 24,
+        pose: pose({
+          head: [24, 12], neck: [24, 17], hip: [24, 28],
+          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+          eL: [18, 16], hL: [13, 14], eR: [30, 16], hR: [35, 14],
+        }),
+      },
+      // relax
+      {
+        t: 32,
+        pose: pose({
+          head: [24, 13], neck: [24, 18], hip: [24, 28],
+          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+          eL: [20, 22], hL: [18, 27], eR: [28, 22], hR: [30, 27],
+        }),
+      },
+      { t: 40, pose: pose() },
+    ],
+  },
 };
 
 // --- Social gestures (coordinated pair behaviors during a visit) --------------
@@ -416,10 +511,11 @@ export const kick: Anim = {
 // The cubeman reaches up, pulls up, and steps onto the neighbor cube above
 // (or lowers down to the cube below).
 
-/** Stretch up to grab a ladder rung. */
+/** Stretch up to grab a ladder rung. Loops while climbing (reaches, pulls,
+ *  releases — one cycle per rung) as the pose slides vertically. */
 export const climbUp: Anim = {
   dur: 30,
-  loop: false,
+  loop: true,
   keys: [
     { t: 0, pose: pose() },
     // reach up
@@ -446,10 +542,11 @@ export const climbUp: Anim = {
   ],
 };
 
-/** Reach down and step off a ladder to the cube below. */
+/** Reach down and step off a ladder to the cube below. Loops while climbing
+ *  down (reaches, steps, recovers) as the pose slides vertically. */
 export const climbDown: Anim = {
   dur: 28,
-  loop: false,
+  loop: true,
   keys: [
     { t: 0, pose: pose() },
     // reach down

@@ -257,39 +257,68 @@ object. The split keeps character state and world state evolving separately:
   from grid adjacency, never scene-array ordering: left/right stay within
   the same row; up/down move by `columns` slots. No diagonal connections or
   wrapping across row boundaries are allowed. `neighborOf(cube, dir)` returns
-  a cube only when that adjacent slot is occupied. Visits consider all four
-  directions and skip destinations that cannot accept a visitor. A
+  a cube only when that adjacent slot is occupied. A
   cube is home to one resident plus **at most one visitor**, and is **closed**
   (curtained) while its resident is away.
   `Shelf.columns` drives both neighbor lookup and the CSS column count.
   To expand the layout later, change the column count and provide the
-  corresponding slots; internal room doors remain left/right-only.
+  corresponding slots (3×3 is the practical ceiling given the canvas layout);
+  internal room doors remain left/right-only.
+  **Multi-hop travel**: `pathTo(from, to)` searches the adjacency graph
+  breadth-first (fewest hops wins; the shelf is tiny, 3×3 at most) and
+  returns the legs of a route. Intermediate
+  cubes must be *traversable*: resident home, no visitor inside, no guest
+  inbound — you can't walk through a curtained room or through a room about to
+  host a visit. The destination's acceptance is checked separately via
+  `canAcceptVisitor`.
 - **`Stamina`** (`src/game/stamina.ts`) — per-cubeman energy (see above).
 - **Rendering** (`src/render/lcd.ts`, `src/main.ts`) — `LCD.drawBatch`
   composites several skeletons over one shared backdrop: a cube's display
   draws its current room, then **every** cubeman standing in it (resident +
   visitor, i.e. shared-room occupancy). A closed cube draws a curtain instead.
+  Cross-cube travel is animated as **room scenery driven by the CUBE**:
+  `doorFx` (a doorway in the exit/entry side wall that opens, holds, closes)
+  and `ladderOn` (the ceiling/floor hatch ladder, shown while a cubeman
+  climbs in or out — the climber's pose slides vertically via `shiftY`).
 
 **Autonomous visit** — a first-class cubeman behavior (not a button press),
-coordinated by `VisitSession` (`src/game/visit.ts`). The simple model:
+coordinated by `VisitSession` (`src/game/visit.ts`). The model:
 
 1. **A decides** — from its home living room, an idle cubeman sometimes picks a
-   connected neighbor (`startVisit`). Self-guards: only from home + living room
-   + a connected edge, otherwise a clean no-op.
-2. **Check B is home** (`canAcceptVisitor`) → A disappears from A's cube (which
-   drops a curtain) and appears in B's living room. The session starts: both
-   are marked `inVisit` (A's solo autonomy is suspended, A's buttons go dead),
-   pinned to B's living room, and social beats (chat/wave) fire every 5–9s.
-3. **B not home** → nothing happens; A continues its solo life.
+   destination: any placed cube that `canAcceptVisitor` and is reachable via
+   `pathTo` — an adjacent cube, or a multi-hop route through traversable
+   cubes. Self-guards: only from home + living room, and never while a guest
+   is already inbound (the host stays home to receive them).
+2. **The trip** — A walks the route leg by leg (`travelRoute`): at each
+   boundary the door opens on the correct side or the ladder hatch appears,
+   the cubeman crosses, and the door closes behind. Each crossing costs
+   `STAMINA.COST_CROSS`. `visitTarget` is set from departure to full arrival —
+   it is how the shelf and other cubemen see an inbound guest (state alone
+   can't, because the visitor's cube only changes at the crossing itself).
+   Travel time is NOT stay time: the visit clock starts on arrival.
+3. **The session** — when A has strolled into B's living room, the session
+   starts: both are marked `inVisit` (A's solo autonomy is suspended, A's
+   buttons go dead), pinned to B's living room, and social beats (chat/wave)
+   fire every 5–9s.
+4. **B not home / no route** → nothing happens; A continues its solo life.
 
 The session ends on a 20–40s timer, or earlier if the visitor is tired (it goes
 home to sleep). **Returning home is always allowed** — a cubeman can never be
-stranded even if the other is visiting its home at the same moment. The visitor
-teleports back to its own living room and the curtain lifts.
+stranded: the return also walks the multi-hop route (`returnHome` uses
+`pathTo`; the teleport fallback exists only for the pathological case of the
+home cube leaving the shelf mid-visit).
 
 Internal room doors (`scene` edges) still use the scene graph within a cube;
 `neighbor` edges and the shelf handle the cross-cube hop, kept distinct from
 scene ordering.
+
+**Headless regression sim** — `pnpm sim` (scripts/social-sim.mjs) loads the
+game modules through Vite with stubbed browser globals and a fake clock, runs
+a line layout where outer cubes require a 2-hop visit, and asserts: in-session
+visitors always have a home host, multi-hop visits occur, and nobody ends up
+stranded. Run it after any change to `Shelf`, `Cubeman` travel, or
+`VisitSession`.
+
 
 ## Debugging cubeman behavior
 

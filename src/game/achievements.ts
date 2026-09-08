@@ -3,6 +3,8 @@ export interface Achievement {
   name: string;
   desc: string;
   test: (counts: Record<string, number>, total: number) => boolean;
+  /** Hidden achievements render as "???" until earned — a discovery treat. */
+  hidden?: boolean;
 }
 
 const LIST: Achievement[] = [
@@ -31,6 +33,20 @@ const LIST: Achievement[] = [
     test: (c) => !!c['pirouette'] && !!c['moonwalk'] && !!c['jazz-hands'],
   },
   {
+    id: 'fresh-and-clean',
+    name: 'Fresh & Clean',
+    desc: 'Have a shower or a bath in the bathroom',
+    hidden: true,
+    test: (c) => (c['shower'] ?? 0) >= 1 || (c['bath'] ?? 0) >= 1,
+  },
+  {
+    id: 'squeaky-clean',
+    name: 'Squeaky Clean',
+    desc: 'Have both a shower AND a bath',
+    hidden: true,
+    test: (c) => (c['shower'] ?? 0) >= 1 && (c['bath'] ?? 0) >= 1,
+  },
+  {
     id: 'showstopper',
     name: 'Showstopper',
     desc: 'Perform 25 total actions',
@@ -39,6 +55,15 @@ const LIST: Achievement[] = [
 ];
 
 const STORAGE_KEY = 'matchman.achievements.v1';
+
+/** Wipe persisted achievement progress (used by the debug reset command). */
+export function clearAchievementStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // storage unavailable — nothing to wipe
+  }
+}
 
 /**
  * Tracks action usage and unlocks achievements. Progression unlocks
@@ -80,13 +105,15 @@ export class Achievements {
     this.persist();
   }
 
-  /** Snapshot for UI panels (goals list). */
-  status(): Array<{ id: string; name: string; desc: string; done: boolean }> {
+  /** Snapshot for UI panels (goals list). Hidden entries are marked so the
+   *  UI can mask them with "???" until they are earned. */
+  status(): Array<{ id: string; name: string; desc: string; done: boolean; hidden: boolean }> {
     return LIST.map((a) => ({
       id: a.id,
       name: a.name,
       desc: a.desc,
       done: this.unlocked.has(a.id),
+      hidden: !!a.hidden,
     }));
   }
 

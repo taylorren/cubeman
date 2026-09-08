@@ -4,8 +4,8 @@ import { LCD } from './render/lcd';
 import { sample } from './render/skeleton';
 import { professions } from './content/professions';
 import type { Overlay } from './content/professions';
-import { Achievements } from './game/achievements';
-import { Cube } from './game/cube';
+import { Achievements, clearAchievementStorage } from './game/achievements';
+import { Cube, doorOpenness } from './game/cube';
 import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
 import { VisitSession } from './game/visit';
@@ -21,8 +21,7 @@ gameLog.setEnabled(new URLSearchParams(window.location.search).get('debug') !== 
 type ResidentDefinition = { id: string; name: string; professionId: string; unlock?: string };
 const definitions: ResidentDefinition[] = [
   { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
-  { id: 'cube-1', name: 'Pip', professionId: 'stickman' },
-  { id: 'cube-2', name: 'Riff', professionId: 'dancer', unlock: 'warmed-up' },
+  { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
@@ -99,6 +98,12 @@ const debugControls = {
   export: () => gameLog.export(),
   status: () => gameLog.status(),
   flush: () => gameLog.flush(),
+  /** Wipe persisted progression (achievements → goals and cubeman unlocks)
+   *  and reload, so a fresh session starts with only Sticko. */
+  resetProgress(): void {
+    clearAchievementStorage();
+    window.location.reload();
+  },
   snapshot: () => ({
     cubemen: cubemen.map((c) => ({ ...c.debugState(), slot: shelf.slotOf(c.home) })),
     visits: visits.map((v) => v.debugState()),
@@ -200,7 +205,9 @@ function storeCube(cube: Cube): void {
 
 function triggerFor(cubeman: Cubeman, spec: string): void {
   if (spec === 'random') {
-    const pool = cubeman.prof.actions;
+    // Surprise picks among the actions usable where the cubeman is now
+    // (room-locked actions like shower/bath only enter the pool in the bathroom)
+    const pool = cubeman.actionsInCurrentRoom();
     cubeman.press(pool[Math.floor(Math.random() * pool.length)]!);
     return;
   }
@@ -222,22 +229,28 @@ function toyFor(cube: Cube): Toy {
   const controls = document.createElement('div');
   controls.className = 'buttons';
   const buttons: HTMLButtonElement[] = [];
-  const actions = [
-    ...cube.prof.actions.map((action, i) => ({ spec: String(i), label: String(i + 1), name: action.name })),
-    { spec: 'random', label: '★', name: 'Surprise' },
+  // Exactly three buttons: the first two actions on either side, and a
+  // middle "Surprise" that picks one of the actions at random. Unlabeled.
+  const actions = cube.prof.actions;
+  const layout: Array<{ spec: string; star?: boolean }> = [
+    { spec: '0' },
+    { spec: 'random', star: true },
+    { spec: '1' },
   ];
-  for (const action of actions) {
+  for (const entry of layout) {
+    const isRandom = entry.spec === 'random';
+    const action = isRandom ? undefined : actions[Number(entry.spec)];
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'btn' + (action.spec === 'random' ? ' btn-star' : '');
-    button.textContent = action.label;
-    button.dataset.action = action.spec;
-    button.title = action.name;
-    button.setAttribute('aria-label', `${cubeman.name}: ${action.name}`);
+    button.className = 'btn' + (isRandom ? ' btn-star' : '');
+    button.value = entry.spec;
+    button.setAttribute('aria-label',
+      `${cubeman.name}: ${action ? action.name : 'Surprise (one of all actions)'}`);
+    button.title = action?.name ?? 'Surprise';
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       selectCube(cube);
-      triggerFor(cubeman, action.spec);
+      triggerFor(cubeman, entry.spec);
     });
     buttons.push(button);
     controls.append(button);
@@ -305,8 +318,9 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.ctrlKey || e.metaKey || e.altKey ||
       (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable="true"]'))) return;
+  // 3-button toy layout: keys 1/2 = first two actions, 0 or * = Surprise
   const spec = e.key === '0' || e.key === '*' ? 'random' :
-    /^[1-9]$/.test(e.key) ? String(Number(e.key) - 1) : null;
+    e.key === '1' ? '0' : e.key === '2' ? '1' : null;
   if (spec === null) return;
   if (!selectedCube) {
     setStatus('Place and select a cube first.');
@@ -329,15 +343,23 @@ function renderGoals(): void {
       const box = document.createElement('span');
       const name = document.createElement('div');
       name.className = 'goal-name';
-      name.textContent = a.name;
+      // hidden achievements stay a mystery until earned
+      name.textContent = a.hidden && !a.done ? '???' : a.name;
       const desc = document.createElement('div');
       desc.className = 'goal-desc';
-      desc.textContent = a.desc;
+      desc.textContent = a.hidden && !a.done ? 'Keep exploring to discover…' : a.desc;
       box.append(name, desc);
       li.append(state, box);
       return li;
     }),
   );
+}
+
+/** The unlock requirement text for a locked cubeman, sourced from the
+ *  achievement list so hints can never drift from the actual requirement. */
+function lockedNote(unlockId?: string): string {
+  const a = achievements.status().find((s) => s.id === unlockId);
+  return a ? `Locked · ${a.name}: ${a.desc}` : 'Locked';
 }
 
 function renderRoster(): void {
@@ -350,7 +372,7 @@ function renderRoster(): void {
     let face: HTMLElement;
     if (cube) {
       const canvas = document.createElement('canvas');
-      canvas.className = 'chip-face';
+      canvas.className = `chip-face chip-face-${profession.id}`;
       new LCD(canvas, 48, 1).draw(sample(profession.idle, 0), 0);
       face = canvas;
     } else {
@@ -366,8 +388,11 @@ function renderRoster(): void {
     const note = document.createElement('div');
     note.className = 'chip-note';
     const slot = cube ? shelf.slotOf(cube) : -1;
-    note.textContent = !cube ? 'Unlock Warming Up: perform 10 actions' :
-      slot >= 0 ? `Slot ${slot + 1}` : 'Stored · place on an empty slot to play';
+    // locked chips show their unlock requirement straight from the
+    // achievement list — one source of truth, no hardcoded hints
+    note.textContent = !cube
+      ? lockedNote(definition.unlock)
+      : slot >= 0 ? `Slot ${slot + 1}` : 'Stored · place on an empty slot to play';
     box.append(name, note);
     if (cube) {
       const actions = document.createElement('div');
@@ -418,7 +443,7 @@ function updatePlacementAvailability(): void {
 }
 
 ensureUnlockedCubemen();
-const saved = loadPlacement(new Set(cubesById.keys()), ['cube-0', 'cube-1', null, null]);
+const saved = loadPlacement(new Set(cubesById.keys()), ['cube-0', null, null, null]);
 saved.slots.forEach((id, index) => {
   if (id === null) return;
   const result = shelf.place(cubesById.get(id)!, index);
@@ -457,6 +482,29 @@ const curtainOverlay: Overlay = (ctx) => {
   for (let y = 7; y < 44; y += 6) ctx.fillRect(2, y, 44, 2); // folds
 };
 
+// --- Travel scenery: ladder hatch + doors ------------------------------------
+
+function drawLadder(ctx: CanvasRenderingContext2D): void {
+  // A ladder through the ceiling/floor hatch, shown while a cubeman is
+  // climbing in or out at the room's ladder position (body-center x = 24).
+  for (const rx of [20, 28]) ctx.fillRect(rx, 5, 1, 39); // rails
+  for (let y = 9; y < 44; y += 5) ctx.fillRect(20, y, 9, 1); // rungs
+}
+
+function drawDoor(ctx: CanvasRenderingContext2D, dir: 'left' | 'right', open: number): void {
+  // A doorway in a side wall: the opening grows upward from the floor as
+  // the door retracts into the wall, then shrinks again as it closes.
+  const w = 4;
+  const x = dir === 'right' ? 48 - w : 0;
+  const top = 10;
+  const height = 30;
+  const opening = Math.round(open * height);
+  if (opening > 0) ctx.fillRect(x, top + height - opening, w, opening);
+  // frame posts so the doorway reads even when fully open
+  ctx.fillRect(x, top - 1, w, 1);
+  ctx.fillRect(x, top + height, w, 1);
+}
+
 // --- Loop: ONE loop updates the world and renders every occupied slot -------
 
 let wsFrame = 0;
@@ -491,7 +539,12 @@ const loop = new Loop(
       for (const b of toy.buttons) b.disabled = cubeman.isVisitor;
       slot.classList.toggle('curtained', closed);
       toy.lcd.drawBatch(wsFrame, {
-        behind: (ctx, f) => cube.drawRoom(ctx, cube.currentSceneId, f),
+        behind: (ctx, f) => {
+          cube.drawRoom(ctx, cube.currentSceneId, f);
+          // travel scenery: ladder hatch and doors live in the room itself
+          if (cube.ladderOn) drawLadder(ctx);
+          if (cube.doorFx) drawDoor(ctx, cube.doorFx.dir, doorOpenness(cube.doorFx.t));
+        },
         sprites: closed
           ? []
           : occupants.map((c) => ({

@@ -55,6 +55,14 @@ export function shiftX(p: Skeleton, dx: number): Skeleton {
   return out;
 }
 
+/** Offset every joint vertically (positive = down). Used for ladder travel,
+ *  where the climber's pose slides out through the ceiling or floor. */
+export function shiftY(p: Skeleton, dy: number): Skeleton {
+  const out = {} as Skeleton;
+  for (const j of JOINTS) out[j] = [p[j][0], p[j][1] + dy];
+  return out;
+}
+
 /** Rotate every joint around a pivot (used for flips and cartwheels). */
 export function rot(p: Skeleton, deg: number, cx = 24, cy = 24): Skeleton {
   const r = (deg * Math.PI) / 180;

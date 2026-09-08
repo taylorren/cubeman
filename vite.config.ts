@@ -99,6 +99,9 @@ function installLogEndpoint(server: ViteDevServer | PreviewServer): void {
 }
 
 export default defineConfig({
+  // Bind to all interfaces so the app is reachable from other LAN devices.
+  server: { host: true },
+  preview: { host: true },
   plugins: [{
     name: 'cubeman-file-logs',
     configureServer: installLogEndpoint,

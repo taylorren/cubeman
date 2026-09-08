@@ -1,11 +1,10 @@
-import { animExtent, sample, shiftX } from '../render/skeleton';
+import { animExtent, sample, shiftX, shiftY } from '../render/skeleton';
 import type { Anim } from '../render/skeleton';
 import { LCD } from '../render/lcd';
 import * as shared from '../content/professions/shared';
 import type { Action, Profession } from '../content/professions';
 import { GRACE_MS, STAMINA, Stamina } from './stamina';
 import type { Cube } from './cube';
-import { SHELF_DIRECTIONS } from './shelf';
 import type { Dir, Shelf } from './shelf';
 import { gameLog } from '../core/debug';
 import type { LogDetails } from '../core/debug';
@@ -21,11 +20,11 @@ const SPONTANEOUS_MAX_MS = 14_000;
 const WANDER_MIN_MS = 2_500;
 const WANDER_MAX_MS = 6_000;
 /** Boredom nap after this long without interaction. */
-const SLEEP_AFTER_MS = 180_000;
+const SLEEP_AFTER_MS = 300_000;
 const WALK_SPEED = 0.3; // author px per frame
 
 /** Wander-roll odds of autonomously deciding to visit a neighbor. */
-const VISIT_CHANCE = 0.12;
+const VISIT_CHANCE = 0.06;
 
 type Mode = {
   anim: Anim;
@@ -68,6 +67,11 @@ export class Cubeman {
 
   /** Where the cubeman currently is — NOT necessarily its home cube. */
   cube: Cube;
+
+  /** The cube this cubeman is currently TRAVELING to visit (set at departure,
+   *  cleared on arrival). Lets the shelf see pending guests that haven't
+   *  started their VisitSession yet — departure-time checks only. */
+  visitTarget: Cube | null = null;
 
   private mode: Mode;
   private frame = 0;
@@ -181,21 +185,37 @@ export class Cubeman {
     this.nextSpontaneous =
       performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS) * slowdown;
     this.log('action.start', { action: action.id, source: spontaneous ? 'autonomous' : 'input' });
-    this.onAction?.(action);
+    // progress (achievements) counts only actions the player explicitly
+    // triggered — a cubeman's autonomous living shouldn't earn player goals.
+    if (!spontaneous) this.onAction?.(action);
   }
 
   /** Pick an action, favoring cheaper ones when tired — flips stay possible,
    *  just rarer. */
   private pickAction(pool: Action[]): Action {
+    // only offer actions usable in the current room (room-locked actions
+    // like shower/bath are hidden until the cubeman is in the bathroom)
+    const usable = pool.filter((a) => !a.room || a.room === this.currentRoom);
     const tired = this.stamina.get() < STAMINA.TIRED;
-    if (!tired) return pool[Math.floor(Math.random() * pool.length)]!;
-    const weights = pool.map((a) => 1 / (a.effort ?? 8));
+    if (!tired) return usable[Math.floor(Math.random() * usable.length)]!;
+    const weights = usable.map((a) => 1 / (a.effort ?? 8));
     let r = Math.random() * weights.reduce((s, w) => s + w, 0);
-    for (let i = 0; i < pool.length; i++) {
+    for (let i = 0; i < usable.length; i++) {
       r -= weights[i]!;
-      if (r <= 0) return pool[i]!;
+      if (r <= 0) return usable[i]!;
     }
-    return pool[pool.length - 1]!;
+    return usable[usable.length - 1]!;
+  }
+
+  /** All the profession's actions the cubeman could perform right now —
+   *  room-locked ones are excluded until the cubeman is in that room. */
+  actionsInCurrentRoom(): Action[] {
+    return this.prof.actions.filter((a) => !a.room || a.room === this.currentRoom);
+  }
+
+  /** The id of the room the cubeman currently stands in. */
+  get currentRoom(): string {
+    return this.cube.currentSceneId;
   }
 
   // --- Stage discipline: wide actions need room -------------------------------
@@ -225,6 +245,12 @@ export class Cubeman {
    *  is too cramped for it. (Room-crossing walks are intentional off-screen
    *  movement and go through startWalkTo directly — they are exempt.) */
   private runAction(action: Action, spontaneous = false): void {
+    // room-locked actions only run in their room — a shower while in the
+    // living room is ignored, so it "only happens" in the bathroom.
+    if (action.room && this.currentRoom !== action.room) {
+      this.log('action.rejected', { action: action.id, requiredRoom: action.room, room: this.currentRoom });
+      return;
+    }
     const [lo, hi] = this.safeBand(action);
     if (this.cx() >= lo && this.cx() <= hi) {
       this.startAction(action, spontaneous);
@@ -343,50 +369,85 @@ export class Cubeman {
   private static readonly EXIT_X: Record<Dir, number> = { left: 3, right: 45, up: 24, down: 24 };
   private static readonly ENTRY_X: Record<Dir, number> = { left: 45, right: 3, up: 24, down: 24 };
 
-      /** Walk toward the neighbor in `dir`, transition cubes, then call `next`.
-   *  For left/right neighbors the cubeman walks to the door, appears on the
-   *  other side, and strolls inward. For up/down, a climb animation plays
-   *  at the ladder before swapping cubes. */
+  /** Author-px stepped through the doorway when crossing left/right. */
+  private static readonly DOOR_STEP = 7;
+  /** Ticks spent climbing out of (and then into) a cube via the ladder. */
+  private static readonly CLIMB_TICKS = 32;
+  /** Author-px of vertical travel so the climber fully clears the screen. */
+  private static readonly CLIMB_SHIFT = 46;
+
+  /** Ladder travel in progress (see crossCube); advances in tick(). */
+  private climb: {
+    dir: 'up' | 'down';
+    phase: 'exit' | 'enter';
+    dest: Cube;
+    next: () => void;
+    ticks: number;
+  } | null = null;
+  /** Vertical pose offset while climbing (positive = toward the floor). */
+  private climbY = 0;
+
+      /** Walk to the exit edge, cross ONE cube boundary, then call `next` just
+   *  inside the destination (no walk-in — the caller decides where to head
+   *  next, which is what makes multi-hop routes chainable).
+   *  Left/right: the door on the exit wall opens, the cubeman steps through
+   *  the doorway, the cube swaps, and the door on the entry wall closes
+   *  behind them. Up/down: the ladder hatch appears, the cubeman climbs out
+   *  through the ceiling/floor (pose slides off-screen), the cube swaps, and
+   *  they climb in through the floor/ceiling of the destination. */
   private crossCube(dir: Dir, dest: Cube, next: () => void): void {
     const edgeX = Cubeman.EXIT_X[dir];
     this.startWalkTo(edgeX, () => {
-      if (dir === 'up' || dir === 'down') {
-        // play the ladder climb before teleporting
-        const climb = dir === 'up' ? shared.climbUp : shared.climbDown;
+      // crossing a cube boundary costs the same as crossing an internal door
+      this.stamina.spend(STAMINA.COST_CROSS);
+      if (dir === 'left' || dir === 'right') {
+        // door opens in the wall we're exiting through; it closes itself
+        this.cube.beginDoor(dir);
         this.busy = true;
         this.mode = {
-          anim: climb,
-          loop: false,
+          anim: shared.walk,
+          loop: true,
+          // step through the doorway — past the wall edge, clipped by the screen
+          walkTarget: this.x + (dir === 'left' ? -Cubeman.DOOR_STEP : Cubeman.DOOR_STEP),
           onEnd: () => {
-            const from = this.cube.id;
-            this.cube = dest;
-            this.cube.currentSceneId = dest.hub().id;
-            this.x = Cubeman.ENTRY_X[dir];
-            this.log('cube.cross', { from, to: dest.id, direction: dir });
-            // walk inward to center of the new living room
-            this.startWalkTo(24, () => next());
+            this.swapCube(dest, dir);
+            // door opens ahead of us in the room we're entering, then closes
+            this.cube.beginDoor(dir === 'left' ? 'right' : 'left');
+            next();
           },
         };
         this.frame = 0;
       } else {
-        // simple door step-through: swap cube and walk in from the opposite side
-        const from = this.cube.id;
-        this.cube = dest;
-        this.cube.currentSceneId = dest.hub().id;
-        this.x = Cubeman.ENTRY_X[dir];
-        this.log('cube.cross', { from, to: dest.id, direction: dir });
-        // walk inward toward center from whichever side we entered
-        this.startWalkTo(24, () => next());
+        // ladder: hatch appears, we climb out vertically (climb state
+        // advances in tick(), swaps cubes at the halfway point)
+        this.cube.beginLadder();
+        this.busy = true;
+        this.mode = { anim: dir === 'up' ? shared.climbUp : shared.climbDown, loop: true };
+        this.frame = 0;
+        this.climb = { dir, phase: 'exit', dest, next, ticks: 0 };
       }
     });
   }
 
+  /** Land in `dest` after crossing in `dir`: swap the cube, set the entry
+   *  position, and log the crossing. */
+  private swapCube(dest: Cube, dir: Dir): void {
+    const from = this.cube.id;
+    this.cube = dest;
+    this.cube.currentSceneId = dest.hub().id;
+    this.x = this.cxToTarget(Cubeman.ENTRY_X[dir]);
+    this.log('cube.cross', { from, to: dest.id, direction: dir });
+  }
+
   /**
-   * Autonomous "visit": A decides to visit a connected neighbor B.
-   *   1. A decides (only from home, in the living room, to a connected cube)
-   *   2. Walk to the appropriate edge, animate the crossing (door or ladder),
-   *      appear in B's living room, then stroll inward
-   *   3. The VisitSession starts from onVisitArrived callback
+   * Autonomous "visit": A decides to visit another cubeman's cube.
+   *   1. A decides (only from home, in the living room)
+   *   2. Pick a reachable destination: any placed cube whose route exists and
+   *      whose host can accept a visitor — adjacency is enough for a single
+   *      hop, but multi-hop routes through traversable cubes work too
+   *   3. Walk the route leg by leg (door or ladder crossings), arrive in the
+   *      host's living room
+   *   4. The VisitSession starts from the onVisitArrived callback
    */
   private startVisit(): void {
     this.scheduleWander();
@@ -395,42 +456,69 @@ export class Cubeman {
       this.log('visit.rejected', { reason: this.cube !== this.home ? 'not-home' : 'not-in-hub' });
       return;
     }
-    // Shelf-grid connections are independent of internal room doors.
-    const neighbor = this.visitableNeighbor();
-    if (!neighbor) {
+    // A guest is already on the way to see me — stay home to receive them.
+    // (Without this, the resident could depart while the visitor is en route,
+    // leaving the visitor arriving at a closed, empty cube.)
+    if (this.shelf.isExpectingVisitor(this.home, this)) {
+      this.log('visit.rejected', { reason: 'guest-inbound' });
+      return;
+    }
+    const plan = this.pickVisitDestination();
+    if (!plan) {
       this.log('visit.rejected', { reason: 'no-available-neighbor' });
       return;
     }
-    const { dir, dest } = neighbor;
-    if (!this.shelf.canAcceptVisitor(dest, this)) {
-      this.log('visit.rejected', {
-        reason: 'destination-unavailable',
-        destination: dest.id,
-        resident: this.shelf.residentOf(dest)?.debugState() ?? null,
+    // Walk the whole route, then stroll into the host's living room. The
+    // onVisitArrived callback starts the VisitSession once we've fully
+    // arrived. visitTarget is set for the whole trip — including every
+    // intermediate hop — so other cubemen can see a guest is inbound (and
+    // the host knows to stay home) from departure to arrival.
+    this.visitTarget = plan.dest;
+    this.travelRoute(plan.route, () => {
+      this.startWalkTo(24, () => {
+        this.visitTarget = null;
+        this.log('visit.arrived', { direction: plan.route[0]!.dir, hops: plan.route.length });
+        this.onVisitArrived?.(this);
       });
-      return;
-    }
-    // Walk to the edge of our living room, cross into the neighbor's cube,
-    // and stroll inward. The onVisitArrived callback starts the VisitSession
-    // once we've fully arrived and are standing in the host's living room.
-    this.crossCube(dir, dest, () => {
-      this.log('visit.arrived', { direction: dir });
-      this.onVisitArrived?.(this);
     });
   }
 
-  /** The adjacent cube (if any) reachable via the shelf's slot table. */
-  private visitableNeighbor(): { dir: Dir; dest: Cube } | null {
-    for (const dir of SHELF_DIRECTIONS) {
-      const dest = this.shelf.neighborOf(this.cube, dir);
-      if (dest && this.shelf.canAcceptVisitor(dest, this)) return { dir, dest };
+  /** Every placed cube this cubeman could visit right now: reachable through
+   *  traversable cubes, with a host that can accept a visitor. Picks one at
+   *  random so all reachable friends get their share of visits. */
+  private pickVisitDestination(): { route: Array<{ dir: Dir; dest: Cube }>; dest: Cube } | null {
+    const candidates: Array<{ route: Array<{ dir: Dir; dest: Cube }>; dest: Cube }> = [];
+    for (const cube of this.shelf.cubes()) {
+      if (cube === this.home) continue;
+      if (!this.shelf.canAcceptVisitor(cube, this)) continue;
+      const route = this.shelf.pathTo(this.home, cube);
+      if (route && route.length > 0) candidates.push({ route, dest: cube });
     }
-    return null;
+    return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)]! : null;
   }
 
-    /** Walk to the edge of the current room toward home, cross the cube boundary
-   *  (door or ladder), arrive at the home living room, and walk inward. Then
-   *  run `next`. Used by VisitSession to return the visitor home. */
+  /** Walk a route leg by leg. Each leg crosses one cube boundary (door or
+   *  ladder); between legs the cubeman walks across the intermediate room
+   *  toward the next exit. `next` fires after the final leg's arrival. */
+  private travelRoute(legs: Array<{ dir: Dir; dest: Cube }>, next: () => void): void {
+    if (legs.length === 0) {
+      next();
+      return;
+    }
+    const [leg, ...rest] = legs;
+    this.crossCube(leg.dir, leg.dest, () => {
+      if (rest.length > 0) {
+        // head across this room toward the next leg's exit edge
+        this.startWalkTo(Cubeman.EXIT_X[rest[0]!.dir], () => this.travelRoute(rest, next));
+      } else {
+        next();
+      }
+    });
+  }
+
+  /** Walk the route home (multi-hop when the shelf arrangement requires it),
+   *  stroll into the home living room, then run `next`. Used by VisitSession
+   *  to return the visitor home and by sleep routing. */
   private returnHome(next: () => void): void {
     this.log('return.start');
     if (this.cube === this.home) {
@@ -438,11 +526,11 @@ export class Cubeman {
       next();
       return;
     }
-    // Determine which direction home is, relative to the current cube.
     const fromId = this.cube.id;
-    const dir = this.shelf.exitDirection(this.cube, this.home);
-    if (!dir) {
-      // No shelf-level path — fall back to teleport.
+    const route = this.shelf.pathTo(this.cube, this.home);
+    if (!route) {
+      // No shelf-level path (e.g. the home cube was stored mid-visit —
+      // placement guards make this rare) — fall back to teleport.
       this.cube = this.home;
       this.cube.currentSceneId = this.home.hub().id;
       this.x = 0;
@@ -450,10 +538,11 @@ export class Cubeman {
       next();
       return;
     }
-    // Walk to the edge, cross, and arrive home.
-    this.crossCube(dir, this.home, () => {
-      this.log('return.arrived', { from: fromId, alreadyHome: false });
-      next();
+    this.travelRoute(route, () => {
+      this.startWalkTo(24, () => {
+        this.log('return.arrived', { from: fromId, alreadyHome: false });
+        next();
+      });
     });
   }
 
@@ -678,6 +767,34 @@ export class Cubeman {
     // sleep is the ONLY recovery channel
     if (this.mode.anim === this.prof.sleep) this.stamina.regen(STAMINA.REGEN_PER_TICK);
 
+    // ladder travel: climb out of this cube, swap at the ceiling/floor,
+    // climb into the destination, then hand control back to walking
+    if (this.climb) {
+      const c = this.climb;
+      c.ticks++;
+      const p = Math.min(1, c.ticks / Cubeman.CLIMB_TICKS);
+      if (c.phase === 'exit') {
+        // slide out through the ceiling (up) or floor (down)
+        this.climbY = (c.dir === 'up' ? -p : p) * Cubeman.CLIMB_SHIFT;
+        if (c.ticks >= Cubeman.CLIMB_TICKS) {
+          this.cube.endLadder();
+          this.swapCube(c.dest, c.dir);
+          this.cube.beginLadder();
+          this.climb = { ...c, phase: 'enter', ticks: 0 };
+        }
+      } else {
+        // climb in from the floor (up) or ceiling (down) of the new room
+        this.climbY = (c.dir === 'up' ? 1 : -1) * (1 - p) * Cubeman.CLIMB_SHIFT;
+        if (c.ticks >= Cubeman.CLIMB_TICKS) {
+          this.climbY = 0;
+          this.climb = null;
+          this.cube.endLadder();
+          c.next();
+        }
+      }
+      return; // the climb consumes this tick — no walking or autonomy
+    }
+
     // walking: advance x toward the target, stop when arrived. Cost is
     // charged per SCREEN pixel actually moved (author px × BODY_SCALE),
     // including the final (possibly shorter) arrival step.
@@ -688,7 +805,13 @@ export class Cubeman {
       this.stamina.spend(STAMINA.COST_WALK_PX * Math.abs(step) * LCD.BODY_SCALE);
       if (this.x === this.mode.walkTarget) {
         this.log('walk.arrived');
+        const mode = this.mode;
         (this.mode.onEnd ?? (() => this.backToIdle()))();
+        // A zero-length walk (already at the target) would re-fire its onEnd
+        // every tick if the callback didn't take over the mode (e.g. an
+        // arrival callback that couldn't start a session). Settle to idle
+        // instead so arrival callbacks fire exactly once.
+        if (this.mode === mode) this.backToIdle();
       }
     }
     if (!this.mode.loop && this.mode.walkTarget === undefined && this.frame >= this.mode.anim.dur) {
@@ -779,14 +902,23 @@ export class Cubeman {
     return this.mode.anim === this.prof.sleep;
   }
 
+  /** The ladder direction while a climb transition anim is playing (drives
+   *  the ladder overlay on the cube's display), or null otherwise. */
+  get climbing(): Dir | null {
+    if (this.mode.anim === shared.climbUp) return 'up';
+    if (this.mode.anim === shared.climbDown) return 'down';
+    return null;
+  }
+
   /** This cubeman's own animation clock (for per-cubeman overlay timing). */
   get animFrame(): number {
     return this.frame;
   }
 
   /** The cubeman's current rendered pose, shifted to its screen position.
-   *  The caller composites this onto a cube's shared backdrop via LCD. */
+   *  The caller composites this onto a cube's shared backdrop via LCD.
+   *  climbY slides the pose vertically while traveling via ladder. */
   pose() {
-    return shiftX(sample(this.mode.anim, this.frame), this.x);
+    return shiftY(shiftX(sample(this.mode.anim, this.frame), this.x), this.climbY);
   }
 }

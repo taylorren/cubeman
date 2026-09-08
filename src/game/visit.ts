@@ -25,7 +25,11 @@ const BALL_CHANCE = 0.35;
 
 /**
  * The coordinator for a single visit. Created the moment a visit is accepted
- * and torn down when it ends. It is the ONE place that owns "togetherness":
+ * AND the visitor has fully arrived in the host's living room — the walk to
+ * the edge, the door/ladder crossing, and the walk inward are all travel,
+ * NOT stay time: the visit duration and social-beat clock below start from
+ * `now` (arrival), so none of the travel consumes the visit. Torn down when
+ * the visit ends. It is the ONE place that owns "togetherness":
  * it swaps the host room from solo to social, dispatches shared social beats
  * to BOTH participants, seals both to the host's living room, and ends the
  * visit (duration up, or the visitor needs to go home to sleep).

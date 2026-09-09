@@ -22,10 +22,11 @@ type ResidentDefinition = { id: string; name: string; professionId: string; unlo
 const definitions: ResidentDefinition[] = [
   { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
   { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
+  { id: 'cube-4', name: 'Melody', professionId: 'musician', unlock: 'jam-session' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
-const shelf = new Shelf([null, null, null, null], cubemen);
+const shelf = new Shelf([null, null, null, null, null, null, null, null, null], cubemen, 3);
 const shelfEl = document.getElementById('shelf')!;
 shelfEl.style.setProperty('--shelf-n', String(shelf.columns));
 const slots = [...shelfEl.querySelectorAll<HTMLElement>('.slot[data-slot]')];
@@ -452,7 +453,7 @@ function updatePlacementAvailability(): void {
 }
 
 ensureUnlockedCubemen();
-const saved = loadPlacement(new Set(cubesById.keys()), ['cube-0', null, null, null]);
+const saved = loadPlacement(new Set(cubesById.keys()), ['cube-0', null, null, null, null, null, null, null, null]);
 saved.slots.forEach((id, index) => {
   if (id === null) return;
   const result = shelf.place(cubesById.get(id)!, index);

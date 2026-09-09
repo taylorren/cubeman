@@ -52,6 +52,12 @@ const LIST: Achievement[] = [
     desc: 'Perform 25 total actions',
     test: (_c, total) => total >= 25,
   },
+  {
+    id: 'jam-session',
+    name: 'Jam Session',
+    desc: 'Perform 20 total actions — unlocks the Musician!',
+    test: (_c, total) => total >= 20,
+  },
 ];
 
 const STORAGE_KEY = 'matchman.achievements.v1';

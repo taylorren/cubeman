@@ -8,6 +8,7 @@ import type { Cube } from './cube';
 import type { Dir, Shelf } from './shelf';
 import { gameLog } from '../core/debug';
 import type { LogDetails } from '../core/debug';
+import { playSound } from '../core/sound';
 
 function randRange(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -22,6 +23,9 @@ const WANDER_MAX_MS = 6_000;
 /** Boredom nap after this long without interaction. */
 const SLEEP_AFTER_MS = 300_000;
 const WALK_SPEED = 0.3; // author px per frame
+/** If more than this much wall-clock time passes between ticks (e.g. tab was
+ *  backgrounded), reset all timers to "now + interval" instead of bursting. */
+const MAX_DELTA_MS = 1000;
 
 /** Wander-roll odds of autonomously deciding to visit a neighbor. */
 const VISIT_CHANCE = 0.06;
@@ -87,6 +91,7 @@ export class Cubeman {
   private sleptInBed = false;
   private nextSpontaneous: number;
   private nextWander: number;
+  private lastTick = 0;
   /** Timestamp of each room's last visit — drives fair room rotation. */
   private roomLastVisited: Record<string, number> = {};
   /** Set while participating in a visit: whether THIS one is the visitor.
@@ -173,6 +178,7 @@ export class Cubeman {
     this.busy = true;
     this.mode = { anim: action.anim, loop: false, action, onEnd: () => this.backToIdle() };
     this.frame = 0;
+    if (action.sound) playSound(action.sound); // synthesized sound (Musician only)
     this.stamina.spend(action.effort ?? 8); // user presses still perform, but cost energy
     if (!spontaneous) {
       this.lastInteract = performance.now();
@@ -275,6 +281,8 @@ export class Cubeman {
   private scheduleWander(): void {
     this.nextWander = performance.now() + randRange(WANDER_MIN_MS, WANDER_MAX_MS);
   }
+
+
 
   /** Walk to a body-center screen x, then continue with `next`. */
   private startWalkTo(cxTarget: number, next: () => void): void {
@@ -795,6 +803,16 @@ export class Cubeman {
   /** One fixed-timestep update: autonomous life, movement, recovery. */
   tick(): void {
     this.frame++;
+    // If too much wall-clock time passed since the last tick (e.g. the tab was
+    // backgrounded), reset all timers to "now + interval" instead of bursting
+    // through every due action at once — that burst is what freezes the browser.
+    const now = performance.now();
+    if (this.lastTick !== 0 && now - this.lastTick > MAX_DELTA_MS) {
+      this.nextSpontaneous = now + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
+      this.nextWander = now + randRange(WANDER_MIN_MS, WANDER_MAX_MS);
+      this.graceUntil = now;
+    }
+    this.lastTick = now;
     // sleep is the PRIMARY recovery channel; a therapeutic action in progress
     // (shower/bath) also regens energy at its own rate while it plays.
     if (this.mode.anim === this.prof.sleep) this.stamina.regen(STAMINA.REGEN_PER_TICK);
@@ -857,7 +875,6 @@ export class Cubeman {
     // clock/movement above, but skip all solo autonomy and sleep routing.
     if (this.inVisit) return;
 
-    const now = performance.now();
     // rested enough? wake up (bed sleep ends at 90, flops at 55) — but only
     // after the minimum nap duration; a press can always interrupt sooner
     if (

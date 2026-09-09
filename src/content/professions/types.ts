@@ -1,4 +1,5 @@
 import type { Anim } from '../../render/skeleton';
+import type { SoundId } from '../../core/sound';
 
 /** Extra LCD elements drawn in 48×48 space, thresholded like the skeleton. */
 export type Overlay = (ctx: CanvasRenderingContext2D, frame: number) => void;
@@ -62,6 +63,9 @@ export interface Action {
    *  therapeutic actions like shower/bath feed the energy budget in addition
    *  to sleep — a soak regens faster than an ordinary shower. */
   regen?: number;
+  /** Synthesized sound to play when this action starts (default none). Sparse
+   *  by design — only the Musician's actions produce sound. */
+  sound?: SoundId;
 }
 
 /**

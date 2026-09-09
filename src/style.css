@@ -49,7 +49,7 @@ body {
   color: #7d8aa5;
 }
 
-/* --- App layout: shelf + rail ------------------------------------------------- */
+/* --- App layout: achievements | shelf | cubemen (3 columns) ------------------ */
 
 .app {
   flex: 1;
@@ -57,9 +57,18 @@ body {
   align-items: stretch;
   gap: 24px;
   padding: 24px 28px;
-  max-width: 1100px;
+  max-width: 1500px;
   width: 100%;
   margin: 0 auto;
+}
+
+.rail {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
 }
 
 .shelf-wrap {
@@ -86,8 +95,8 @@ body {
 
 /* main.ts synchronizes the column count with the shelf's neighbor grid. */
 .shelf {
-  --shelf-n: 2;
-  --slot: min(300px, calc((100vw - 420px) / var(--shelf-n)));
+  --shelf-n: 3;
+  --slot: min(280px, calc((100vw - 600px) / var(--shelf-n)));
   display: grid;
   grid-template-columns: repeat(var(--shelf-n), var(--slot));
   gap: 0;
@@ -142,6 +151,10 @@ button:focus-visible {
 
 .cube-dancer {
   background: #7640a8;
+}
+
+.cube-musician {
+  background: #b45309;
 }
 
 .bezel {
@@ -206,12 +219,16 @@ button:focus-visible {
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
-/* The middle Surprise control shows a star "random" glyph. */
-.btn-star {
-  font-size: 20px;
-}
+/* The middle Surprise control shows a solid circle with a ring. */
 .btn-star::before {
-  content: '★';
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #dfe8ff;
+  background: radial-gradient(circle, #dfe8ff 35%, transparent 35%);
+  vertical-align: middle;
 }
 
 /* Dancer profession: pink/purple buttons to match the frame */
@@ -385,9 +402,14 @@ button:focus-visible {
 }
 
 /* Avatar frame matches the cube's frame color per profession (Stickman
-   cubes are blue-framed, the Dancer cube is pink-framed). */
+   cubes are blue-framed, the Dancer cube is purple-framed, the Musician
+   cube is amber-framed). */
 .chip-face-dancer {
   border-color: #7640a8;
+}
+
+.chip-face-musician {
+  border-color: #b45309;
 }
 
 /* Locked (not yet unlocked) avatars keep a neutral frame — no cube exists
@@ -444,19 +466,20 @@ canvas.chip-face {
   padding: 10px 0 16px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .app {
     flex-direction: column;
   }
   .rail {
     width: 100%;
     flex-direction: row;
+    overflow-y: visible;
   }
   .rail .panel {
     flex: 1;
   }
   .shelf {
-    --slot: min(300px, calc((100vw - 90px) / var(--shelf-n)));
+    --slot: min(280px, calc((100vw - 60px) / var(--shelf-n)));
   }
 }
 

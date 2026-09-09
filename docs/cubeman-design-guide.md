@@ -96,6 +96,7 @@ interface Action {
   stand?: number;             // body-center SCREEN x to snap to before the animation plays
   front?: Overlay;            // LCD-space overlay drawn OVER the cubeman while it plays
   regen?: number;             // stamina recovered per tick while playing (sleep is the main channel)
+  sound?: SoundId;            // synthesized sound to play on action start (Musician only)
 }
 ```
 
@@ -123,6 +124,23 @@ Special fields used by the shared bathroom actions (import `shower`/`bath` from
     a second recovery channel alongside sleep. Sleep remains the main charge;
     a therapeutic soak (bath, `regen: 8/30`) refills faster than a shower
     (`regen: 4/30`), making a trip to the bathroom a real refuel.
+
+### Sound
+
+Only the **Musician** profession produces sound — sparse by design (no footsteps,
+UI blips, or ambient). Each of its three actions triggers a synthesized sound
+via Web Audio API (`src/core/sound.ts`) — no audio files, just like the visuals
+are synthesized pixels. The `Action.sound` field opts in; the action system
+plays it on start.
+
+| Action | Sound | Effort | Duration |
+|--------|-------|--------|----------|
+| Symphony No. 5 | Beethoven's G-G-G-Eb motif (brassy sawtooths) | 5 | 72 frames |
+| Air Guitar | Classic rock solo (power chord → bend → run → sustain) | 4 | 84 frames |
+| Ode to Joy | Beethoven's 9th melody (warm choir tones) | 6 | 96 frames |
+
+All three are room-locked to the living room (where the keyboard and speakers
+are). The shared `shower` and `bath` stay silent.
 
 ### Scenes (ambience per room)
 

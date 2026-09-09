@@ -67,6 +67,12 @@ const LIST: Achievement[] = [
     test: (_c, total) => total >= 30,
   },
   {
+    id: 'masterpiece',
+    name: 'Masterpiece',
+    desc: 'Perform 40 total actions — unlocks the Painter!',
+    test: (_c, total) => total >= 40,
+  },
+  {
     id: 'buddy-block',
     name: 'Buddy Block',
     desc: 'Expand the shelf to 2×3 — have 4 rooms receive a visitor',

@@ -25,6 +25,7 @@ const definitions: ResidentDefinition[] = [
   { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
   { id: 'cube-4', name: 'Maestro', professionId: 'musician', unlock: 'jam-session' },
   { id: 'cube-6', name: 'Chandler', professionId: 'chef', unlock: 'culinary-arts' },
+  { id: 'cube-8', name: 'Pablo', professionId: 'painter', unlock: 'masterpiece' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();

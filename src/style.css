@@ -177,6 +177,10 @@ button:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
+.cube-stickman {
+  background: #15803d;
+}
+
 .cube-dancer {
   background: #7640a8;
 }
@@ -187,6 +191,10 @@ button:focus-visible {
 
 .cube-chef {
   background: #b91c1c;
+}
+
+.cube-painter {
+  background: #274bb0;
 }
 
 .bezel {
@@ -451,8 +459,13 @@ button:focus-visible {
 }
 
 /* Avatar frame matches the cube's frame color per profession (Stickman
-   cubes are blue-framed, the Dancer cube is purple-framed, the Musician
-   cube is amber-framed). */
+   cubes are green-framed, the Dancer cube is purple-framed, the Musician
+   cube is amber-framed, the Chef cube is red-framed, the Painter cube is
+   blue-framed). */
+.chip-face-stickman {
+  border-color: #15803d;
+}
+
 .chip-face-dancer {
   border-color: #7640a8;
 }
@@ -463,6 +476,10 @@ button:focus-visible {
 
 .chip-face-chef {
   border-color: #b91c1c;
+}
+
+.chip-face-painter {
+  border-color: #274bb0;
 }
 
 /* Locked (not yet unlocked) avatars keep a neutral frame — no cube exists

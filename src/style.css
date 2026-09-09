@@ -197,6 +197,10 @@ button:focus-visible {
   background: #274bb0;
 }
 
+.cube-astronomer {
+  background: #4338ca;
+}
+
 .bezel {
   background: #0b0d10;
   border-radius: 12px;
@@ -302,6 +306,74 @@ button:focus-visible {
     inset 0 2px 1px rgba(255, 255, 255, 0.3),
     inset 0 -2px 3px rgba(50, 0, 0, 0.45),
     0 1px 0 #6b1515,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Stickman profession: green buttons to match the frame */
+.cube-stickman .btn {
+  background: linear-gradient(#22a355, #15803d 60%, #116b32);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(0, 40, 15, 0.5),
+    0 4px 0 #0c5527,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-stickman .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(0, 40, 15, 0.45),
+    0 1px 0 #0c5527,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Musician profession: amber buttons to match the frame */
+.cube-musician .btn {
+  background: linear-gradient(#d97706, #b45309 60%, #92400e);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(60, 25, 0, 0.5),
+    0 4px 0 #6f3804,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-musician .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(60, 25, 0, 0.45),
+    0 1px 0 #6f3804,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Painter profession: blue buttons to match the frame */
+.cube-painter .btn {
+  background: linear-gradient(#3b62d9, #274bb0 60%, #1e3c8f);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(0, 0, 60, 0.5),
+    0 4px 0 #16295f,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-painter .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(0, 0, 60, 0.45),
+    0 1px 0 #16295f,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Astronomer profession: deep-indigo buttons to match the frame */
+.cube-astronomer .btn {
+  background: linear-gradient(#5b52e0, #4338ca 60%, #372cae);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(10, 0, 60, 0.5),
+    0 4px 0 #2a2196,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-astronomer .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(10, 0, 60, 0.45),
+    0 1px 0 #2a2196,
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -482,6 +554,10 @@ button:focus-visible {
   border-color: #274bb0;
 }
 
+.chip-face-astronomer {
+  border-color: #4338ca;
+}
+
 /* Locked (not yet unlocked) avatars keep a neutral frame — no cube exists
    yet, so there's no bezel color to mirror. */
 .chip-locked .chip-face {
@@ -503,7 +579,22 @@ canvas.chip-face {
   color: #eaf0ff;
 }
 
-.chip-note {
+/* A cubeman who is out visiting: its destination text shines so it is
+   instantly visible in the roster. (Two-class selector wins over the plain
+   .chip-note color rule regardless of order.) */
+.chip-note.note-visiting {
+  color: #ffd75e;
+  text-shadow:
+    0 0 4px rgba(255, 215, 94, 0.8),
+    0 0 9px rgba(255, 190, 40, 0.55),
+    0 0 16px rgba(255, 170, 20, 0.35);
+  animation: visit-shine 1.6s ease-in-out infinite;
+}
+
+@keyframes visit-shine {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
   font-size: 11px;
   color: #9fb4e8;
 }

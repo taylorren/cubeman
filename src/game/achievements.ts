@@ -73,6 +73,12 @@ const LIST: Achievement[] = [
     test: (_c, total) => total >= 40,
   },
   {
+    id: 'stargazer',
+    name: 'Stargazer',
+    desc: 'Perform 50 total actions — unlocks the Astronomer!',
+    test: (_c, total) => total >= 50,
+  },
+  {
     id: 'buddy-block',
     name: 'Buddy Block',
     desc: 'Expand the shelf to 2×3 — have 4 rooms receive a visitor',

@@ -15,8 +15,32 @@ let ctx: AudioContext | null = null;
 
 function audio(): AudioContext {
   if (!ctx) ctx = new AudioContext();
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state === 'suspended') void ctx.resume().catch(() => {
+    // gesture-less resume refused (autoplay policy) — the unlock listeners
+    // below will retry on the next pointerdown/keydown
+  });
   return ctx;
+}
+
+/**
+ * Autoplay-policy unlock: browsers start an AudioContext in the 'suspended'
+ * state when it is created before any user gesture — which happens here when
+ * a Musician action fires AUTONOMOUSLY from idle (no click involved). Browsers
+ * refuse to start audio until the user interacts with the page, so listen for
+ * the first gesture and resume the context then.
+ */
+function unlockAudio(): void {
+  if (ctx?.state === 'suspended') void ctx.resume().catch(() => {});
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', unlockAudio, { capture: true });
+  window.addEventListener('keydown', unlockAudio, { capture: true });
+}
+
+/** Debug: current AudioContext state ('running' | 'suspended' | 'closed' |
+ *  'none' when no context has been created yet). */
+export function audioState(): string {
+  return ctx?.state ?? 'none';
 }
 
 /** Schedule a node for disconnection after a delay (relative to now). */

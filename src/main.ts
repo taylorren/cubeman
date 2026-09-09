@@ -11,6 +11,7 @@ import { Shelf } from './game/shelf';
 import { ShelfProgression, SHELF_TIERS, TOTAL_SLOTS } from './game/shelf-progression';
 import { VisitSession } from './game/visit';
 import { gameLog } from './core/debug';
+import { audioState } from './core/sound';
 import { loadPlacement, savePlacement } from './game/placement-storage';
 
 const FPS = 30;
@@ -26,6 +27,7 @@ const definitions: ResidentDefinition[] = [
   { id: 'cube-4', name: 'Maestro', professionId: 'musician', unlock: 'jam-session' },
   { id: 'cube-6', name: 'Chandler', professionId: 'chef', unlock: 'culinary-arts' },
   { id: 'cube-8', name: 'Pablo', professionId: 'painter', unlock: 'masterpiece' },
+  { id: 'cube-10', name: 'Appleby', professionId: 'astronomer', unlock: 'stargazer' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
@@ -85,6 +87,8 @@ function beginVisit(visitor: Cubeman): void {
     console.debug('[shelf-progression]', shelfProgress.progressSummary());
   };
   visits.push(session);
+  // The roster shows the visitor's "Slot N → Slot M" location; refresh it.
+  renderRoster();
 }
 
 function onShelfTierUp(tier: typeof SHELF_TIERS[number]): void {
@@ -142,6 +146,13 @@ const debugControls = {
     visits: visits.map((v) => v.debugState()),
     layout: shelf.slots.map((cube) => cube?.id ?? null),
   }),
+  /** Human-readable progression status: achievements, shelf tier, roster. */
+  progress(): string {
+    const residents = cubemen.map((c) => c.name).join(', ') || 'none yet';
+    return `${achievements.progressSummary()}\n${shelfProgress.progressSummary()}\nResidents: ${residents}`;
+  },
+  /** Audio subsystem state — useful when the Musician seems silent. */
+  audio: () => audioState(),
   /** Order a cubeman to walk to one of its rooms, e.g.
    *  `cubemanDebug.goToRoom('Sticko', 'bathroom')`. Room matches by id or name. */
   goToRoom(name: string, room: string): string {
@@ -440,11 +451,18 @@ function renderRoster(): void {
     const note = document.createElement('div');
     note.className = 'chip-note';
     const slot = cube ? shelf.slotOf(cube) : -1;
+    // A cubeman who is out visiting shows where it currently is:
+    // "Slot <home> → Slot <guest>" (home is curtained while it is away).
+    const resident = cube ? cubemen.find((c) => c.home === cube) : undefined;
+    const guestSlot = resident && resident.cube !== cube ? shelf.slotOf(resident.cube) : -1;
     // locked chips show their unlock requirement straight from the
     // achievement list — one source of truth, no hardcoded hints
     note.textContent = !cube
       ? lockedNote(definition.unlock)
-      : slot >= 0 ? `Slot ${slot + 1}` : 'Stored · place on an empty slot to play';
+      : guestSlot >= 0
+        ? `Room ${slot + 1} → Room ${guestSlot + 1}`
+        : slot >= 0 ? `Room ${slot + 1}` : 'Stored · place on an empty slot to play';
+    if (guestSlot >= 0) note.classList.add('note-visiting');
     box.append(name, note);
     if (cube) {
       const actions = document.createElement('div');
@@ -572,7 +590,13 @@ const loop = new Loop(
     // returning home on its own now)
     const now = performance.now();
     for (const v of visits) v.tick(now);
-    for (let i = visits.length - 1; i >= 0; i--) if (visits[i]!.isEnded) visits.splice(i, 1);
+    for (let i = visits.length - 1; i >= 0; i--) {
+      if (visits[i]!.isEnded) {
+        visits.splice(i, 1);
+        // A returning visitor's roster chip goes back to its home slot label.
+        renderRoster();
+      }
+    }
     updatePlacementAvailability();
   },
   () => {

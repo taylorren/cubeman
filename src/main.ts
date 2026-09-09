@@ -55,6 +55,11 @@ console.debug('[achievements]', achievements.progressSummary());
 const visits: VisitSession[] = [];
 const shelfProgress = new ShelfProgression();
 
+// Back-fill: players who already expanded the shelf before these achievements
+// existed should get them on startup (unlockById is idempotent).
+if (shelfProgress.current().tier >= 1) achievements.unlockById('buddy-block');
+if (shelfProgress.current().tier >= 2) achievements.unlockById('social-circle');
+
 function beginVisit(visitor: Cubeman): void {
   const host = cubemen.find((c) => c.home === visitor.cube && c !== visitor);
   if (!host) {
@@ -87,6 +92,11 @@ function onShelfTierUp(tier: typeof SHELF_TIERS[number]): void {
   banner.hidden = false;
   clearTimeout(bannerTimer);
   bannerTimer = setTimeout(() => (banner.hidden = true), 3500);
+  // Tier 1+ tier-ups earn their own achievements.
+  // Delay it so the shelf banner finishes showing before the achievement
+  // banner replaces it (both share the same #banner element).
+  if (tier.tier >= 1) setTimeout(() => achievements.unlockById('buddy-block'), 3600);
+  if (tier.tier >= 2) setTimeout(() => achievements.unlockById('social-circle'), 3600);
 }
 
 function ensureUnlockedCubemen(): void {

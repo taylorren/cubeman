@@ -345,7 +345,7 @@ object. The split keeps character state and world state evolving separately:
   | 1 | 6 | 3 | Growing Room | 4 different rooms have each received a visitor |
   | 2 | 7 | 2 | Social Circle | 1 cubeman has visited all other 3 |
   | 3 | 8 | 1 | Busy Block | 2 cubemen have visited all other 3 |
-  | 4 | 9 | 0 | Grand Stage | All 4 cubemen visited all others, 10+ total visits |
+  | 4 | 9 | 0 | Grand Stage | All 4 cubemen visited all others, 20+ total visits |
 
   Locked slots render as greyed-out placeholders with a 🔒 icon and are
   non-interactive. The initial layout is:

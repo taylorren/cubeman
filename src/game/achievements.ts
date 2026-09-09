@@ -2,7 +2,9 @@ export interface Achievement {
   id: string;
   name: string;
   desc: string;
-  test: (counts: Record<string, number>, total: number) => boolean;
+  /** When omitted, the achievement can only be unlocked explicitly via
+   *  Achievements.unlockById (e.g. visit/shelf milestones). */
+  test?: (counts: Record<string, number>, total: number) => boolean;
   /** Hidden achievements render as "???" until earned — a discovery treat. */
   hidden?: boolean;
 }
@@ -64,6 +66,16 @@ const LIST: Achievement[] = [
     desc: 'Perform 30 total actions — unlocks the Chef!',
     test: (_c, total) => total >= 30,
   },
+  {
+    id: 'buddy-block',
+    name: 'Buddy Block',
+    desc: 'Expand the shelf to 2×3 — have 4 rooms receive a visitor',
+  },
+  {
+    id: 'social-circle',
+    name: 'Social Circle',
+    desc: 'Expand the shelf to 7 slots — have one cubeman visit all 3 others',
+  },
 ];
 
 const STORAGE_KEY = 'matchman.achievements.v1';
@@ -108,7 +120,7 @@ export class Achievements {
     this.counts[actionId] = (this.counts[actionId] ?? 0) + 1;
     this.total++;
     for (const a of LIST) {
-      if (!this.unlocked.has(a.id) && a.test(this.counts, this.total)) {
+      if (!this.unlocked.has(a.id) && a.test?.(this.counts, this.total)) {
         this.unlocked.add(a.id);
         this.persist();
         this.onUnlock(a);
@@ -132,6 +144,21 @@ export class Achievements {
   /** Check if a specific achievement is unlocked (used for profession gating). */
   isUnlocked(id: string): boolean {
     return this.unlocked.has(id);
+  }
+
+  /**
+   * Explicitly unlock an achievement outside the normal action-count tests
+   * (e.g. shelf tier-ups, which are visit-milestone based). Returns the
+   * achievement when it was newly unlocked, or null if already unlocked /
+   * unknown id.
+   */
+  unlockById(id: string): Achievement | null {
+    const a = LIST.find((entry) => entry.id === id);
+    if (!a || this.unlocked.has(id)) return null;
+    this.unlocked.add(id);
+    this.persist();
+    this.onUnlock(a);
+    return a;
   }
 
   /** Human-readable status for the debug console. */

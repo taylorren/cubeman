@@ -8,7 +8,7 @@
  *   Tier 1: 4 different rooms have each received a visitor → 2×3 = 6 slots
  *   Tier 2: 1 cubeman has visited all other 3 → 7 slots
  *   Tier 3: 2 cubemen have visited all other 3 → 8 slots
- *   Tier 4: all cubemen have visited all other 3, 10+ total visits → 3×3 = 9 slots
+ *   Tier 4: all cubemen have visited all other 3, 20+ total visits → 3×3 = 9 slots
  */
 
 export const MAX_CUBEMEN = 4;
@@ -121,10 +121,10 @@ export class ShelfProgression {
 
   /** Compute the current tier based on visit milestones. */
   computeTier(): ShelfTier {
-    // Tier 4: all 4 cubemen visited all 3 others, 10+ total visits
+    // Tier 4: all 4 cubemen visited all 3 others, 20+ total visits
     if (
       this.countCubemenVisitedAll(3) >= MAX_CUBEMEN &&
-      this.totalVisits >= 10
+      this.totalVisits >= 20
     ) {
       return SHELF_TIERS[4]!;
     }
@@ -173,7 +173,7 @@ export class ShelfProgression {
         break;
       }
       default:
-        detail = `${this.countCubemenVisitedAll(3)}/4 visited all others, ${this.totalVisits}/10 total visits`;
+        detail = `${this.countCubemenVisitedAll(3)}/4 visited all others, ${this.totalVisits}/20 total visits`;
     }
     return `Shelf: ${tier.name} (${tier.open}/9 slots). Next: ${next.name} — ${detail}. Total visits: ${this.totalVisits}.`;
   }

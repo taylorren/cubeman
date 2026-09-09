@@ -8,11 +8,11 @@ import { Achievements, clearAchievementStorage } from './game/achievements';
 import { Cube, doorOpenness } from './game/cube';
 import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
-import { ShelfProgression, SHELF_TIERS, TOTAL_SLOTS } from './game/shelf-progression';
+import { ShelfProgression, SHELF_TIERS, TOTAL_SLOTS, clearShelfProgressionStorage } from './game/shelf-progression';
 import { VisitSession } from './game/visit';
 import { gameLog } from './core/debug';
 import { audioState } from './core/sound';
-import { loadPlacement, savePlacement } from './game/placement-storage';
+import { loadPlacement, savePlacement, clearPlacementStorage } from './game/placement-storage';
 
 const FPS = 30;
 const PX = 48;
@@ -28,6 +28,7 @@ const definitions: ResidentDefinition[] = [
   { id: 'cube-6', name: 'Chandler', professionId: 'chef', unlock: 'culinary-arts' },
   { id: 'cube-8', name: 'Pablo', professionId: 'painter', unlock: 'masterpiece' },
   { id: 'cube-10', name: 'Appleby', professionId: 'astronomer', unlock: 'stargazer' },
+  { id: 'cube-12', name: 'Merlin', professionId: 'magician', unlock: 'lift-off' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
@@ -39,6 +40,10 @@ const goalsEl = document.getElementById('goals')!;
 const rosterEl = document.getElementById('roster')!;
 const statusEl = document.getElementById('shelf-status')!;
 const banner = document.getElementById('banner')!;
+// Goals panel toggle: collapsed by default (current + next only); switching
+// it on reveals the full list (achieved + current + next). The control is
+// static markup in index.html so it never disappears or rebuilds itself.
+const goalsShowAllEl = document.getElementById('goals-show-all') as HTMLInputElement;
 let bannerTimer: ReturnType<typeof setTimeout> | undefined;
 let selectedCube: Cube | null = null;
 let placingCube: Cube | null = null;
@@ -135,10 +140,13 @@ const debugControls = {
   export: () => gameLog.export(),
   status: () => gameLog.status(),
   flush: () => gameLog.flush(),
-  /** Wipe persisted progression (achievements → goals and cubeman unlocks)
-   *  and reload, so a fresh session starts with only Sticko. */
+  /** Wipe ALL persisted state (achievements → goals and cubeman unlocks;
+   *  shelf tier → slot availability; shelf layout → placement) and reload,
+   *  so a fresh session starts with only Sticko on a 2×2 Cozy Corner. */
   resetProgress(): void {
     clearAchievementStorage();
+    clearShelfProgressionStorage();
+    clearPlacementStorage();
     window.location.reload();
   },
   snapshot: () => ({
@@ -290,6 +298,14 @@ function toyFor(cube: Cube): Toy {
     { spec: 'random', star: true },
     { spec: '1' },
   ];
+  // SECRET COMBO: professions with a secret action (easter-egg profession
+  // unlocks) hide it behind a button sequence on their own cube —
+  // LEFT → RIGHT → MIDDLE(star) within 1.5s. With one mouse, "press and
+  // hold A then click B" is impossible (click only fires where the pointer
+  // went down), so a timed SEQUENCE is the discoverable combo.
+  const secret = actions.find((a) => a.secret);
+  const comboSequence: string[] = [];
+  const comboTimes: number[] = [];
   for (const entry of layout) {
     const isRandom = entry.spec === 'random';
     const action = isRandom ? undefined : actions[Number(entry.spec)];
@@ -303,6 +319,29 @@ function toyFor(cube: Cube): Toy {
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       selectCube(cube);
+      if (secret) {
+        comboSequence.push(entry.spec);
+        comboTimes.push(performance.now());
+        while (comboSequence.length > 3) {
+          comboSequence.shift();
+          comboTimes.shift();
+        }
+        if (
+          comboSequence.length === 3 &&
+          comboSequence.join(',') === '0,1,random' &&
+          comboTimes[2]! - comboTimes[0]! <= 1500
+        ) {
+          comboSequence.length = 0;
+          comboTimes.length = 0;
+          // The first two combo clicks already fired ordinary actions, so the
+          // cubeman is likely BUSY here and press() would ignore the launch.
+          // Force him idle (existing resetMovement) so the rocket actually plays.
+          cubeman.resetMovement();
+          cubeman.press(secret);
+          achievements.unlockById('lift-off');
+          return;
+        }
+      }
       triggerFor(cubeman, entry.spec);
     });
     buttons.push(button);
@@ -394,28 +433,41 @@ document.addEventListener('keydown', (e) => {
 
 // --- Shell panels: goals + roster ---------------------------------------------
 
+// Goals panel: collapsed by default — shows only the CURRENT goal (the next
+// one in the ladder) and the NEXT one after it; completed ones are hidden.
+// The small toggle expands to the full list (achieved + current + next).
+let goalsShowAll = false;
+
 function renderGoals(): void {
-  goalsEl.replaceChildren(
-    ...achievements.status().map((a) => {
-      const li = document.createElement('li');
-      li.className = 'goal' + (a.done ? ' done' : '');
-      const state = document.createElement('span');
-      state.className = 'goal-state';
-      state.textContent = a.done ? '✓' : '';
-      state.setAttribute('aria-label', a.done ? 'Completed' : 'Not completed');
-      const box = document.createElement('span');
-      const name = document.createElement('div');
-      name.className = 'goal-name';
-      // hidden achievements stay a mystery until earned
-      name.textContent = a.hidden && !a.done ? '???' : a.name;
-      const desc = document.createElement('div');
-      desc.className = 'goal-desc';
-      desc.textContent = a.hidden && !a.done ? 'Keep exploring to discover…' : a.desc;
-      box.append(name, desc);
-      li.append(state, box);
-      return li;
-    }),
-  );
+  const status = achievements.status();
+  const pending = status.filter((a) => !a.done);
+  const visible = goalsShowAll ? status : pending.slice(0, 2);
+
+  const items = visible.map((a) => {
+    const li = document.createElement('li');
+    const rank = pending.indexOf(a); // 0 = current, 1 = next
+    li.className = 'goal'
+      + (a.done ? ' done' : '')
+      + (!goalsShowAll && rank === 0 ? ' current' : '')
+      + (!goalsShowAll && rank === 1 ? ' next' : '');
+    const state = document.createElement('span');
+    state.className = 'goal-state';
+    state.textContent = a.done ? '✓' : '';
+    state.setAttribute('aria-label', a.done ? 'Completed' : 'Not completed');
+    const box = document.createElement('span');
+    const name = document.createElement('div');
+    name.className = 'goal-name';
+    // hidden achievements stay a mystery until earned
+    name.textContent = a.hidden && !a.done ? '???' : a.name;
+    const desc = document.createElement('div');
+    desc.className = 'goal-desc';
+    desc.textContent = a.hidden && !a.done ? 'Keep exploring to discover…' : a.desc;
+    box.append(name, desc);
+    li.append(state, box);
+    return li;
+  });
+
+  goalsEl.replaceChildren(...items);
 }
 
 /** The unlock requirement text for a locked cubeman, sourced from the
@@ -503,12 +555,35 @@ function renderRoster(): void {
     rosterEl.append(li);
   }
   updatePlacementAvailability();
+  lastRosterSignature = rosterSignature();
 }
 
 function updatePlacementAvailability(): void {
   for (const button of rosterEl.querySelectorAll<HTMLButtonElement>('button[data-placement-cube]')) {
     const cube = cubesById.get(button.dataset.placementCube!);
     button.disabled = !cube || !shelf.canRearrange(cube);
+  }
+}
+
+/**
+ * Cheap signature of everything the roster LABELS depend on (home slot +
+ * current location per cubeman). Polled each tick; renderRoster() fires only
+ * when it changes. Needed because a visit ending does NOT immediately revert
+ * the visitor's cube — they walk home first — so a one-shot renderRoster()
+ * at session end froze the "Room N → Room M" label until the next event.
+ */
+function rosterSignature(): string {
+  return cubemen
+    .map((c) => `${c.home.id}@${shelf.slotOf(c.home)}:${c.cube === c.home ? 'home' : `at${shelf.slotOf(c.cube)}`}`)
+    .join('|');
+}
+let lastRosterSignature = '';
+
+function refreshRosterIfChanged(): void {
+  const sig = rosterSignature();
+  if (sig !== lastRosterSignature) {
+    lastRosterSignature = sig;
+    renderRoster();
   }
 }
 
@@ -521,6 +596,18 @@ saved.slots.forEach((id, index) => {
 });
 selectedCube = shelf.cubes()[0] ?? null;
 renderGoals();
+goalsShowAllEl.addEventListener('change', () => {
+  goalsShowAll = goalsShowAllEl.checked;
+  const hint = document.getElementById('goals-switch-hint')!;
+  hint.textContent = goalsShowAll ? 'show all: on' : 'focus mode: on';
+  hint.classList.toggle('hot', goalsShowAll);
+  renderGoals();
+});
+// The hint text is itself clickable and flips the toggle.
+document.getElementById('goals-switch-hint')!.addEventListener('click', () => {
+  goalsShowAllEl.click();
+});
+
 renderShelf();
 renderRoster();
 setStatus(saved.warning ?? 'Move or drag cubes from the roster to choose which neighbors connect.');
@@ -593,11 +680,14 @@ const loop = new Loop(
     for (let i = visits.length - 1; i >= 0; i--) {
       if (visits[i]!.isEnded) {
         visits.splice(i, 1);
-        // A returning visitor's roster chip goes back to its home slot label.
+        // The visitor's label reverts when they ARRIVE home, not when the
+        // session ends — refreshRosterIfChanged() in the loop catches that.
+        // A re-render here is still right: the host's controls come alive.
         renderRoster();
       }
     }
     updatePlacementAvailability();
+    refreshRosterIfChanged();
   },
   () => {
     wsFrame++;

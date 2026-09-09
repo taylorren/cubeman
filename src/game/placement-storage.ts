@@ -101,3 +101,14 @@ export function savePlacement(slots: ReadonlyArray<string | null>): string | nul
     return 'Placement changed for this session, but could not be saved.';
   }
 }
+
+/** Wipe the persisted shelf layout (used by the debug reset command). Also
+ *  removes the pre-machine-scoping legacy key. */
+export function clearPlacementStorage(): void {
+  try {
+    localStorage.removeItem(storageKey());
+    localStorage.removeItem(STORAGE_KEY_PREFIX);
+  } catch {
+    // storage unavailable — nothing to wipe
+  }
+}

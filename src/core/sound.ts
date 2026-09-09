@@ -9,7 +9,7 @@
  * audio-node leaks.
  */
 
-type SoundId = 'airGuitar' | 'symphony5' | 'symphony9';
+type SoundId = 'airGuitar' | 'symphony5' | 'symphony9' | 'rocket';
 
 let ctx: AudioContext | null = null;
 
@@ -234,6 +234,33 @@ function playSymphony5(): void {
   brass(ebFreq, when, longLen, 0.22);
 }
 
+/** Rocket launch — a low rumble that rises in pitch as the rocket lifts off
+ *  and fades into the distance. */
+function playRocket(): void {
+  const c = audio();
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(70, t);
+  osc.frequency.exponentialRampToValueAtTime(320, t + 1.7); // rising roar
+  const filter = c.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(500, t);
+  filter.frequency.exponentialRampToValueAtTime(2200, t + 1.7); // brightens too
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.16, t + 0.15);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 2.1);
+  osc.connect(filter);
+  filter.connect(g);
+  g.connect(c.destination);
+  osc.start(t);
+  osc.stop(t + 2.15);
+  dispose(osc, 2.2);
+  dispose(filter, 2.2);
+  dispose(g, 2.2);
+}
+
 /** Play a sound by id. Safe to call before audio is ready — lazily
  *  initializes on first user gesture. */
 export function playSound(id: SoundId): void {
@@ -247,6 +274,9 @@ export function playSound(id: SoundId): void {
         break;
       case 'symphony5':
         playSymphony5();
+        break;
+      case 'rocket':
+        playRocket();
         break;
     }
   } catch {

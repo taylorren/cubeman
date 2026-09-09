@@ -79,6 +79,12 @@ const LIST: Achievement[] = [
     test: (_c, total) => total >= 50,
   },
   {
+    id: 'lift-off',
+    name: 'Lift-Off',
+    desc: 'Appleby knows a secret — try the buttons on his cube…',
+    hidden: true,
+  },
+  {
     id: 'buddy-block',
     name: 'Buddy Block',
     desc: 'Expand the shelf to 2×3 — have 4 rooms receive a visitor',

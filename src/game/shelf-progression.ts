@@ -195,3 +195,13 @@ export class ShelfProgression {
     };
   }
 }
+
+/** Wipe the persisted shelf progression — tier, visit milestones, everything
+ *  that controls slot availability (used by the debug reset command). */
+export function clearShelfProgressionStorage(): void {
+  try {
+    localStorage.removeItem(PROGRESS_KEY);
+  } catch {
+    // storage unavailable — nothing to wipe
+  }
+}

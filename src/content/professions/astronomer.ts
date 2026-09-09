@@ -203,6 +203,118 @@ const meteorSighting: Action = {
 };
 
 /**
+ * Rocket Launch — SECRET action, fired only by the hidden button combo on the
+ * astronomer's cube. Appleby crouches and covers his ears for a countdown,
+ * then a rocket (front overlay) roars up from beside him into the sky. He
+ * stays put — no transformation — and a smoke puff marks the launch pad.
+ */
+const rocketLaunch: Action = {
+  id: 'rocket-launch',
+  name: 'Rocket Launch',
+  effort: 6,
+  secret: true,
+  sound: 'rocket',
+  anim: {
+    dur: 80,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // crouch for the countdown
+      {
+        t: 8,
+        pose: pose({
+          head: [24, 12], neck: [24, 17], hip: [24, 27],
+          kL: [20, 32], fL: [18, 40], kR: [28, 32], fR: [30, 40],
+          eL: [20, 26], hL: [18, 32], eR: [28, 26], hR: [30, 32],
+        }),
+      },
+      // fingers in ears — countdown...
+      {
+        t: 18,
+        pose: pose({
+          head: [24, 11.5], neck: [24, 16.5], hip: [24, 26.5],
+          kL: [20, 31], fL: [18, 40], kR: [28, 31], fR: [30, 40],
+          eR: [27, 10], hR: [24, 7],
+          eL: [21, 10], hL: [24, 7],
+        }),
+      },
+      // ...LIFTOFF! — straighten, eyes up, arm shooting out to track it
+      {
+        t: 34,
+        pose: pose({
+          head: [24.5, 7.5], neck: [24.5, 12.5], hip: [24, 24],
+          eR: [28, 8], hR: [31, 2],
+          eL: [20, 18], hL: [17, 23],
+          kL: [21, 31], fL: [20, 40], kR: [27, 31], fR: [28, 40],
+        }),
+      },
+      // tracking it higher, head thrown back
+      {
+        t: 52,
+        pose: pose({
+          head: [24.5, 7], neck: [24.5, 12],
+          eR: [28, 7], hR: [33, 1],
+          eL: [20, 18], hL: [17, 23],
+        }),
+      },
+      // a satisfied step back and settle
+      {
+        t: 68,
+        pose: pose({
+          head: [24, 8.5], neck: [24, 13.5],
+          eL: [19, 17], hL: [15, 22],
+          eR: [29, 17], hR: [33, 22],
+        }),
+      },
+      { t: 80, pose: pose() },
+    ],
+  },
+  /**
+   * Front overlay — a rocket launching from BESIDE Appleby (his body stays at
+   * body-center x≈24; the rocket pad is at x≈33, clear of him). It sits on
+   * the ground at countdown, then climbs with an exhaust flame past the top
+   * of the screen; a little smoke lingers on the pad.
+   */
+  front(ctx, frame) {
+    const t = frame / 80; // 0..1 across the action
+    const padX = 33;
+
+    // Countdown (0 → 0.42): rocket waits on the ground, flame flickering.
+    if (t < 0.42) {
+      const gentle = Math.floor(frame / 3) % 2 === 0;
+      // pad smoke occasionally
+      if (gentle && frame % 6 === 0) ctx.fillRect(padX - 1, 40, 3, 2);
+      // exhaust under the tail
+      ctx.fillRect(padX - 1, 39, 2, gentle ? 3 : 2);
+      return;
+    }
+
+    // Liftoff (0.42 → 1): rocket climbs off the screen.
+    const bt = (t - 0.42) / 0.58; // 0..1
+    const y = Math.round(40 - bt * 48); // rises from the pad off the top
+    const x = Math.round(padX - 1);
+    if (y > -10) {
+      // exhaust flame below the tail (flickers)
+      const fh = Math.floor(frame / 2) % 2 === 0 ? 4 : 2;
+      ctx.fillRect(x, y + 7, 3, fh);
+      // body
+      ctx.fillRect(x, y + 1, 3, 6);
+      // nose cone
+      ctx.fillRect(x + 1, y - 2, 1, 3);
+      // fins
+      ctx.fillRect(x - 1, y + 3, 1, 2);
+      ctx.fillRect(x + 3, y + 3, 1, 2);
+      // smoke plume at the pad, fading as he climbs
+      const fade = Math.max(0, 1 - bt * 1.4);
+      if (fade > 0) {
+        const w = Math.round(4 + (1 - fade) * 3);
+        ctx.fillRect(padX - w / 2, 42, w, 3);
+      }
+    }
+  },
+};
+
+/**
  * The Astronomer's living room: a night-time observatory. A telescope on
  * a tripod points up through an open dome, stars twinkle across the top,
  * and a star chart is pinned on the left wall. Same arrangement as every
@@ -260,7 +372,7 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const astronomer: Profession = {
   id: 'astronomer',
   name: 'Astronomer',
-  actions: [stargazing, constellationTrace, meteorSighting, shower, bath],
+  actions: [stargazing, constellationTrace, meteorSighting, rocketLaunch, shower, bath],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

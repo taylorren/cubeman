@@ -66,6 +66,10 @@ export interface Action {
   /** Synthesized sound to play when this action starts (default none). Sparse
    *  by design — only the Musician's actions produce sound. */
   sound?: SoundId;
+  /** SECRET actions are excluded from the Surprise pool and from spontaneous
+   *  play — they only fire via a hidden input combo. Used as profession
+   *  unlock easter eggs. */
+  secret?: boolean;
 }
 
 /**

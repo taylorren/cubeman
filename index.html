@@ -18,7 +18,13 @@
     <main class="app">
       <aside class="rail rail-left" aria-label="Achievements">
         <section class="panel">
-          <h2 class="panel-title">Achievements</h2>
+          <h2 class="panel-title">Achievements
+            <span class="switch-hint" id="goals-switch-hint" title="Toggle to show completed achievements too">focus mode: on</span>
+            <label class="switch" title="Show completed achievements">
+              <input type="checkbox" id="goals-show-all" aria-label="Show completed achievements" />
+              <span></span>
+            </label>
+          </h2>
           <ul class="goals" id="goals"></ul>
         </section>
       </aside>

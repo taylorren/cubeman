@@ -215,9 +215,10 @@ export class Cubeman {
   }
 
   /** All the profession's actions the cubeman could perform right now —
-   *  room-locked ones are excluded until the cubeman is in that room. */
+   *  room-locked ones are excluded until the cubeman is in that room, and
+   *  SECRET ones never enter the normal pool (they fire via a hidden combo). */
   actionsInCurrentRoom(): Action[] {
-    return this.prof.actions.filter((a) => !a.room || a.room === this.currentRoom);
+    return this.prof.actions.filter((a) => !a.secret && (!a.room || a.room === this.currentRoom));
   }
 
   /** The id of the room the cubeman currently stands in. */

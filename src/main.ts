@@ -48,7 +48,9 @@ const achievements = new Achievements((a) => {
   ensureUnlockedCubemen();
   renderGoals();
   renderRoster();
+  console.debug('[achievements]', `Unlocked: ${a.name}`, achievements.progressSummary());
 });
+console.debug('[achievements]', achievements.progressSummary());
 
 const visits: VisitSession[] = [];
 const shelfProgress = new ShelfProgression();

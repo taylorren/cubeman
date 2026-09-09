@@ -134,6 +134,19 @@ export class Achievements {
     return this.unlocked.has(id);
   }
 
+  /** Human-readable status for the debug console. */
+  progressSummary(): string {
+    const done = LIST.filter((a) => this.unlocked.has(a.id));
+    const locked = LIST.filter((a) => !this.unlocked.has(a.id));
+    const lines = [`Achievements: ${done.length}/${LIST.length} unlocked (${this.total} total actions).`];
+    for (const a of done) lines.push(`  ✓ ${a.name}`);
+    for (const a of locked) lines.push(`  · ${a.hidden ? '???' : `${a.name} — ${a.desc}`}`);
+    if (Object.keys(this.counts).length > 0) {
+      lines.push(`  Actions: ${Object.entries(this.counts).map(([id, n]) => `${id}×${n}`).join(', ')}`);
+    }
+    return lines.join('\n');
+  }
+
   private persist(): void {
     try {
       localStorage.setItem(

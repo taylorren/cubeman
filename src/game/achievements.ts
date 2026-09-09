@@ -58,6 +58,12 @@ const LIST: Achievement[] = [
     desc: 'Perform 20 total actions — unlocks the Musician!',
     test: (_c, total) => total >= 20,
   },
+  {
+    id: 'culinary-arts',
+    name: 'Culinary Arts',
+    desc: 'Perform 30 total actions — unlocks the Chef!',
+    test: (_c, total) => total >= 30,
+  },
 ];
 
 const STORAGE_KEY = 'matchman.achievements.v1';

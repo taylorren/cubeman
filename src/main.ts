@@ -23,6 +23,7 @@ const definitions: ResidentDefinition[] = [
   { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
   { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
   { id: 'cube-4', name: 'Melody', professionId: 'musician', unlock: 'jam-session' },
+  { id: 'cube-6', name: 'Sizzle', professionId: 'chef', unlock: 'culinary-arts' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();

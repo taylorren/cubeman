@@ -198,10 +198,11 @@ export class Cubeman {
 
   /** Pick an action, favoring cheaper ones when tired — flips stay possible,
    *  just rarer. */
-  private pickAction(pool: Action[]): Action {
+  private pickAction(pool: Action[]): Action | undefined {
     // only offer actions usable in the current room (room-locked actions
     // like shower/bath are hidden until the cubeman is in the bathroom)
     const usable = pool.filter((a) => !a.room || a.room === this.currentRoom);
+    if (usable.length === 0) return undefined;
     const tired = this.stamina.get() < STAMINA.TIRED;
     if (!tired) return usable[Math.floor(Math.random() * usable.length)]!;
     const weights = usable.map((a) => 1 / (a.effort ?? 8));
@@ -927,7 +928,8 @@ export class Cubeman {
       this.stamina.get() >= STAMINA.EXHAUSTED &&
       now >= this.nextSpontaneous
     ) {
-      this.runAction(this.pickAction(this.prof.actions), true);
+      const action = this.pickAction(this.prof.actions);
+      if (action) this.runAction(action, true);
       return;
     }
     // autonomous life when idle: maybe visit a neighbor, otherwise explore /

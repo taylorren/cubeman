@@ -3,6 +3,10 @@
  * visuals are synthesized pixels. Lazy-creates the AudioContext on first use
  * (must be after a user gesture to satisfy browser autoplay policy).
  * Sparse by design: only the Musician profession produces sound.
+ *
+ * Real-time note synthesis: each note creates its own oscillator(s) that play
+ * and auto-stop. A dispose helper schedules cleanup via setTimeout to prevent
+ * audio-node leaks.
  */
 
 type SoundId = 'airGuitar' | 'symphony5' | 'symphony9';
@@ -15,12 +19,36 @@ function audio(): AudioContext {
   return ctx;
 }
 
-/** Schedule a node for disconnection after a delay (relative to now).
- *  Uses setTimeout because osc.onended may not fire if the context is suspended. */
+/** Schedule a node for disconnection after a delay (relative to now). */
 function dispose(node: AudioNode, delaySec: number): void {
   setTimeout(() => {
     try { node.disconnect(); } catch { /* already disconnected */ }
   }, delaySec * 1000);
+}
+
+/** A single oscillator note with a quick pluck envelope. */
+function note(
+  c: AudioContext,
+  freq: number,
+  start: number,
+  dur: number,
+  type: OscillatorType,
+  gain: number,
+): void {
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.connect(g);
+  g.connect(c.destination);
+  g.gain.setValueAtTime(0, start);
+  g.gain.linearRampToValueAtTime(gain, start + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.start(start);
+  osc.stop(start + dur + 0.05);
+  const remaining = Math.max(0, start + dur + 0.1 - c.currentTime);
+  dispose(osc, remaining);
+  dispose(g, remaining);
 }
 
 /** Air Guitar — a longer, classic rock-style solo with multiple phrases.
@@ -50,11 +78,12 @@ function playAirGuitar(): void {
       osc.connect(filter);
       osc.start(start);
       osc.stop(start + dur + 0.05);
+      const remaining = Math.max(0, start + dur + 0.1 - c.currentTime);
+      dispose(osc, remaining);
+      dispose(filter, remaining);
     }
-    // disconnect all nodes after the note finishes (relative delay)
     const remaining = Math.max(0, start + dur + 0.1 - c.currentTime);
     dispose(g, remaining);
-    dispose(filter, remaining);
   }
 
   // phrase 1: opening power chord (E)
@@ -79,61 +108,41 @@ function playAirGuitar(): void {
   let when = t3;
   for (const n of run) {
     fuzz(n.f, when, n.d, 0.13);
-    when += n.d;
+    when += n.d + 0.02;
   }
 
-  // phrase 4: sustained finish (low E, long decay)
-  fuzz(164.81, t + 1.7, 0.6, 0.16);
-  fuzz(82.41, t + 1.7, 0.6, 0.12);
+  // phrase 4: sustained low-E finish
+  fuzz(164.81, t + 1.7, 0.5, 0.12); // E3
 }
 
 /** Symphony No. 9 — Beethoven's "Ode to Joy" first phrase.
- *  A warm, choir-like statement of the famous melody. */
+ *  E-E-F-G-G-F-E-D-C-C-D-E-E-D-D — warm, choir-like tones. */
 function playSymphony9(): void {
   const c = audio();
   const t = c.currentTime;
-  // Ode to Joy first phrase in C major: E E F G G F E D C C D E E D D
-  const melody = [
-    { f: 329.63, d: 0.18 }, // E4
-    { f: 329.63, d: 0.18 }, // E4
-    { f: 349.23, d: 0.18 }, // F4
-    { f: 392.0, d: 0.36 },  // G4 (long)
-    { f: 392.0, d: 0.18 },  // G4
-    { f: 349.23, d: 0.18 }, // F4
-    { f: 329.63, d: 0.18 }, // E4
-    { f: 293.66, d: 0.18 }, // D4
-    { f: 261.63, d: 0.36 }, // C4 (long)
-    { f: 261.63, d: 0.18 }, // C4
-    { f: 293.66, d: 0.18 }, // D4
-    { f: 329.63, d: 0.18 }, // E4
-    { f: 329.63, d: 0.27 }, // E4 (long)
-    { f: 293.66, d: 0.54 }, // D4 (long, final)
+
+  // melody: E4-E4-F4-G4-G4-F4-E4-D4-C4-C4-D4-E4-E4-D4-D4
+  const melody: Array<{ f: number; d: number }> = [
+    { f: 329.63, d: 0.22 }, // E4
+    { f: 329.63, d: 0.22 }, // E4
+    { f: 349.23, d: 0.22 }, // F4
+    { f: 392.0, d: 0.44 }, // G4 (long)
+    { f: 392.0, d: 0.22 }, // G4
+    { f: 349.23, d: 0.22 }, // F4
+    { f: 329.63, d: 0.22 }, // E4
+    { f: 293.66, d: 0.22 }, // D4
+    { f: 261.63, d: 0.44 }, // C4 (long)
+    { f: 261.63, d: 0.22 }, // C4
+    { f: 293.66, d: 0.22 }, // D4
+    { f: 329.63, d: 0.44 }, // E4 (long)
+    { f: 329.63, d: 0.22 }, // E4
+    { f: 293.66, d: 0.44 }, // D4 (long)
+    { f: 293.66, d: 0.44 }, // D4 (long)
   ];
   let when = t;
   for (const n of melody) {
-    // warm choir tone: triangle + sine, slight detune
-    const g = c.createGain();
-    const filt = c.createBiquadFilter();
-    filt.type = 'lowpass';
-    filt.frequency.value = 2500;
-    filt.connect(g);
-    g.connect(c.destination);
-    g.gain.setValueAtTime(0, when);
-    g.gain.linearRampToValueAtTime(0.12, when + 0.02);
-    g.gain.setValueAtTime(0.12, when + n.d * 0.7);
-    g.gain.exponentialRampToValueAtTime(0.001, when + n.d);
-    for (const type of ['triangle', 'sine'] as const) {
-      const osc = c.createOscillator();
-      osc.type = type;
-      osc.frequency.value = n.f;
-      osc.connect(filt);
-      osc.start(when);
-      osc.stop(when + n.d + 0.05);
-    }
-    // disconnect shared nodes after the note finishes (relative delay)
-    const remaining = Math.max(0, when + n.d + 0.1 - c.currentTime);
-    dispose(g, remaining);
-    dispose(filt, remaining);
+    note(c, n.f, when, n.d, 'triangle', 0.12);
+    note(c, n.f, when, n.d, 'sine', 0.06);
     when += n.d;
   }
 }
@@ -143,9 +152,10 @@ function playSymphony9(): void {
 function playSymphony5(): void {
   const c = audio();
   const t = c.currentTime;
+
   // G4 = 392Hz, Eb4 = 311Hz. Rhythm: three short, one long.
-  const g = 392.0;
-  const eb = 311.13;
+  const gFreq = 392.0;
+  const ebFreq = 311.13;
   const noteLen = 0.16; // short eighth notes
   const gap = 0.04;
   const longLen = 0.9; // long final note
@@ -158,7 +168,6 @@ function playSymphony5(): void {
     filt.frequency.value = 1200; // brassy brightness
     filt.connect(gNode);
     gNode.connect(c.destination);
-    // envelope: quick attack, sustain, quick drop at end
     gNode.gain.setValueAtTime(0, start);
     gNode.gain.linearRampToValueAtTime(peak, start + 0.03);
     gNode.gain.setValueAtTime(peak, start + dur * 0.7);
@@ -171,6 +180,9 @@ function playSymphony5(): void {
       osc.connect(filt);
       osc.start(start);
       osc.stop(start + dur + 0.05);
+      const remaining = Math.max(0, start + dur + 0.1 - c.currentTime);
+      dispose(osc, remaining);
+      dispose(filt, remaining);
     }
     // a touch of triangle in the body for warmth
     const tri = c.createOscillator();
@@ -182,24 +194,23 @@ function playSymphony5(): void {
     triG.connect(gNode);
     tri.start(start);
     tri.stop(start + dur + 0.05);
-    // disconnect all nodes after the note finishes (relative delay)
     const remaining = Math.max(0, start + dur + 0.1 - c.currentTime);
-    dispose(gNode, remaining);
-    dispose(filt, remaining);
+    dispose(tri, remaining);
     dispose(triG, remaining);
+    dispose(gNode, remaining);
   }
 
   // three short Gs
   let when = t;
   for (let i = 0; i < 3; i++) {
-    brass(g, when, noteLen, 0.18);
+    brass(gFreq, when, noteLen, 0.18);
     when += noteLen + gap;
   }
   // one long Eb (the "fate" note)
-  brass(eb, when, longLen, 0.22);
+  brass(ebFreq, when, longLen, 0.22);
 }
 
-/** Play a synthesized sound by id. Safe to call before audio is ready — lazily
+/** Play a sound by id. Safe to call before audio is ready — lazily
  *  initializes on first user gesture. */
 export function playSound(id: SoundId): void {
   try {

@@ -94,6 +94,18 @@ const LIST: Achievement[] = [
     name: 'Social Circle',
     desc: 'Expand the shelf to 7 slots — have one cubeman visit all 3 others',
   },
+  {
+    id: 'green-thumb',
+    name: 'Green Thumb',
+    desc: 'Perform 60 total actions — unlocks the Botanist!',
+    test: (_c, total) => total >= 60,
+  },
+  {
+    id: 'secret-garden',
+    name: 'Secret Garden',
+    desc: 'Briar knows a secret — try the buttons on her cube…',
+    hidden: true,
+  },
 ];
 
 const STORAGE_KEY = 'matchman.achievements.v1';

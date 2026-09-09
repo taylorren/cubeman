@@ -1,8 +1,17 @@
-import type { Anim } from '../../render/skeleton';
+import type { Anim, Skeleton } from '../../render/skeleton';
 import type { SoundId } from '../../core/sound';
 
 /** Extra LCD elements drawn in 48×48 space, thresholded like the skeleton. */
 export type Overlay = (ctx: CanvasRenderingContext2D, frame: number) => void;
+
+/**
+ * A body layer drawn WITH the skeleton, in the SAME body-scale transform, so
+ * silhouette styling (hair, a skirt, an apron) tracks every pose — idle sway,
+ * wandering, actions, sleep. The pose passed is the cubeman's CURRENT rendered
+ * pose (already shifted to its screen position), so authored shapes anchor to
+ * the live `head`/`hip` joints and move with the animation.
+ */
+export type BodyOverlay = (ctx: CanvasRenderingContext2D, frame: number, s: Skeleton) => void;
 
 /**
  * Where a scene edge leads. Only the "hub" scene (the living room) may
@@ -70,6 +79,18 @@ export interface Action {
    *  play — they only fire via a hidden input combo. Used as profession
    *  unlock easter eggs. */
   secret?: boolean;
+  /** When `secret`, the achievement id this action's hidden-combo UNLOCKS
+   *  (e.g. `'lift-off'`). Lets each profession's secret grant its own
+   *  achievement instead of a fixed one. */
+  unlock?: string;
+  /** When `secret`, the button sequence that triggers this action. Each
+   *  entry is a button spec (`'0'`=left, `'1'`=right, `'random'`=middle star).
+   *  Defaults to the classic LEFT→RIGHT→MIDDLE sweep if omitted. A longer or
+   *  alternating pattern is harder to stumble into. */
+  combo?: string[];
+  /** When `secret`, the max ms allowed between the first and last combo
+   *  press. Defaults to 1500ms. */
+  comboWindow?: number;
 }
 
 /**
@@ -83,6 +104,10 @@ export interface Profession {
   /** Shared behaviors applied to every profession. */
   idle: Anim;
   sleep: Anim;
+  /** Optional persistent body presentation (hair, clothing, silhouette).
+   *  Drawn on top of the skeleton in the body-scale transform after the pose
+   *  is drawn, so it inherits every animation. Omit for the neutral stickman. */
+  presentation?: BodyOverlay;
   /** Rooms of this cubeman's home cube; the first is the hub/entry room. */
   scenes: Scene[];
 }

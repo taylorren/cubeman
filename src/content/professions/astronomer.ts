@@ -213,6 +213,7 @@ const rocketLaunch: Action = {
   name: 'Rocket Launch',
   effort: 6,
   secret: true,
+  unlock: 'lift-off',
   sound: 'rocket',
   anim: {
     dur: 80,

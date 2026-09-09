@@ -177,6 +177,23 @@ button:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
+/* -- THE 9-COLOR CUBE PALETTE (locked) -------------------------------------
+   One frame color per profession, spread around the hue wheel for clear
+   identity at a glance on the 3×3 shelf:
+      Chef       Red       #b91c1c   0°       (1)
+      Musician   Orange    #c2410c   ~25°     (2)
+      Lawyer     Leather   #a9742f   ~38°     (3)
+      Stickman   Green     #15803d   ~145°    (4)
+      Astronomer Teal      #0f766e   ~180°    (5)
+      Painter    Blue      #274bb0   ~225°    (6)
+      Dancer     Purple    #7640a8   ~276°    (7)
+      Botanist   Rose      #d6336c   ~333°    (8)
+      Magician   Charcoal  #1f2937   dark     (9)  the one dark shell
+   Gold  #d9a406  is RESERVED — the hidden 10th (final) profession. It is
+   deliberately NOT in the palette above.
+   Every profession's colors are declared once in this block AND mirrored in
+   .chip-face-* so the roster avatar frame matches its cube. Keep both in sync. */
+
 .cube-stickman {
   background: #15803d;
 }
@@ -186,7 +203,7 @@ button:focus-visible {
 }
 
 .cube-musician {
-  background: #b45309;
+  background: #c2410c;
 }
 
 .cube-chef {
@@ -198,11 +215,19 @@ button:focus-visible {
 }
 
 .cube-astronomer {
-  background: #4338ca;
+  background: #0f766e;
 }
 
 .cube-magician {
   background: #1f2937;
+}
+
+.cube-botanist {
+  background: #d6336c;
+}
+
+.cube-lawyer {
+  background: #a9742f;
 }
 
 .bezel {
@@ -330,20 +355,20 @@ button:focus-visible {
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
-/* Musician profession: amber buttons to match the frame */
+/* Musician profession: orange buttons to match the frame */
 .cube-musician .btn {
-  background: linear-gradient(#d97706, #b45309 60%, #92400e);
+  background: linear-gradient(#de6120, #c2410c 60%, #9a3408);
   box-shadow:
     inset 0 2px 1px rgba(255, 255, 255, 0.4),
     inset 0 -3px 4px rgba(60, 25, 0, 0.5),
-    0 4px 0 #6f3804,
+    0 4px 0 #783009,
     0 7px 10px rgba(0, 0, 0, 0.35);
 }
 .cube-musician .btn:active {
   box-shadow:
     inset 0 2px 1px rgba(255, 255, 255, 0.3),
     inset 0 -2px 3px rgba(60, 25, 0, 0.45),
-    0 1px 0 #6f3804,
+    0 1px 0 #783009,
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -364,20 +389,20 @@ button:focus-visible {
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
-/* Astronomer profession: deep-indigo buttons to match the frame */
+/* Astronomer profession: deep-teal buttons to match the frame */
 .cube-astronomer .btn {
-  background: linear-gradient(#5b52e0, #4338ca 60%, #372cae);
+  background: linear-gradient(#18a59b, #0f766e 60%, #0c5f5a);
   box-shadow:
     inset 0 2px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -3px 4px rgba(10, 0, 60, 0.5),
-    0 4px 0 #2a2196,
+    inset 0 -3px 4px rgba(0, 45, 40, 0.5),
+    0 4px 0 #0a4d48,
     0 7px 10px rgba(0, 0, 0, 0.35);
 }
 .cube-astronomer .btn:active {
   box-shadow:
     inset 0 2px 1px rgba(255, 255, 255, 0.3),
-    inset 0 -2px 3px rgba(10, 0, 60, 0.45),
-    0 1px 0 #2a2196,
+    inset 0 -2px 3px rgba(0, 45, 40, 0.45),
+    0 1px 0 #0a4d48,
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -395,6 +420,40 @@ button:focus-visible {
     inset 0 2px 1px rgba(255, 255, 255, 0.3),
     inset 0 -2px 3px rgba(0, 0, 0, 0.5),
     0 1px 0 #10151c,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Botanist profession: rose buttons to match the frame */
+.cube-botanist .btn {
+  background: linear-gradient(#f05a90, #d6336c 60%, #a91f52);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(70, 10, 35, 0.5),
+    0 4px 0 #8f1a44,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-botanist .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(70, 10, 35, 0.45),
+    0 1px 0 #8f1a44,
+    0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Lawyer profession: leather-tan buttons to match the frame */
+.cube-lawyer .btn {
+  background: linear-gradient(#c08a43, #a9742f 60%, #7d4f1d);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 4px rgba(45, 25, 5, 0.5),
+    0 4px 0 #68411a,
+    0 7px 10px rgba(0, 0, 0, 0.35);
+}
+.cube-lawyer .btn:active {
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(45, 25, 5, 0.45),
+    0 1px 0 #68411a,
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -634,7 +693,7 @@ button:focus-visible {
 /* Avatar frame matches the cube's frame color per profession (Stickman
    cubes are green-framed, the Dancer cube is purple-framed, the Musician
    cube is amber-framed, the Chef cube is red-framed, the Painter cube is
-   blue-framed). */
+   blue-framed, and the Botanist cube is rose-framed). */
 .chip-face-stickman {
   border-color: #15803d;
 }
@@ -644,7 +703,7 @@ button:focus-visible {
 }
 
 .chip-face-musician {
-  border-color: #b45309;
+  border-color: #c2410c;
 }
 
 .chip-face-chef {
@@ -656,11 +715,19 @@ button:focus-visible {
 }
 
 .chip-face-astronomer {
-  border-color: #4338ca;
+  border-color: #0f766e;
 }
 
 .chip-face-magician {
   border-color: #1f2937;
+}
+
+.chip-face-botanist {
+  border-color: #d6336c;
+}
+
+.chip-face-lawyer {
+  border-color: #a9742f;
 }
 
 /* Locked (not yet unlocked) avatars keep a neutral frame — no cube exists

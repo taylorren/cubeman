@@ -93,6 +93,8 @@ a unique set of actions and a themed room.
 | Pablo | Painter | 40 actions |
 | Appleby | Astronomer | 50 actions |
 | Merlin | Magician | *A secret on Appleby's cube…* |
+| Briar | Botanist | 60 actions |
+| Laura | Lawyer | *A secret on Briar's cube…* |
 
 (Only actions **you** trigger with the buttons count toward these — a cubeman
 acting on their own doesn't earn progress.)
@@ -108,6 +110,12 @@ open more slots and unlock the corresponding achievement:
 - More visits open 8 and 9 slots.
 
 Arrange residents next to each other to get the invites flowing.
+
+---
+
+## License
+
+Released under the [MIT License](./LICENSE).
 
 ---
 

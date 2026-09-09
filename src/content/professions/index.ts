@@ -6,6 +6,8 @@ import { chef } from './chef';
 import { painter } from './painter';
 import { astronomer } from './astronomer';
 import { magician } from './magician';
+import { botanist } from './botanist';
+import { lawyer } from './lawyer';
 
 export const professions: Record<string, Profession> = {
   stickman,
@@ -15,6 +17,8 @@ export const professions: Record<string, Profession> = {
   painter,
   astronomer,
   magician,
+  botanist,
+  lawyer,
 };
 
 export * from './types';

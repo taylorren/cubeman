@@ -1,4 +1,4 @@
-import type { Overlay } from '../content/professions';
+import type { BodyOverlay, Overlay } from '../content/professions';
 import type { Skeleton } from './skeleton';
 
 /**
@@ -54,11 +54,11 @@ export class LCD {
   draw(
     s: Skeleton,
     frame: number,
-    opts: { behind?: Overlay; front?: Overlay } = {},
+    opts: { behind?: Overlay; front?: Overlay; body?: BodyOverlay } = {},
   ): void {
     this.drawBatch(frame, {
       behind: opts.behind,
-      sprites: [{ skeleton: s, front: opts.front }],
+      sprites: [{ skeleton: s, body: opts.body, front: opts.front }],
     });
   }
 
@@ -71,7 +71,7 @@ export class LCD {
     frame: number,
     opts: {
       behind?: Overlay;
-      sprites: Array<{ skeleton: Skeleton; front?: Overlay }>;
+      sprites: Array<{ skeleton: Skeleton; body?: BodyOverlay; front?: Overlay }>;
       /** Full-screen overlay drawn after all sprites (e.g. a curtain over an
        *  empty, closed cube). Lives in LCD space like the sprite fronts. */
       front?: Overlay;
@@ -124,7 +124,12 @@ export class LCD {
       ss * (LCD.GROUND_Y - LCD.AUTHOR_FEET_Y * bs), // author feet land on ground
     );
     octx.lineWidth = 2.6 / bs; // keep limb thickness in screen units
-    for (const sprite of opts.sprites) skeleton(sprite.skeleton);
+    for (const sprite of opts.sprites) {
+      skeleton(sprite.skeleton);
+      // a persistent body layer (hair, clothing) tracks the pose in the SAME
+      // body-scale transform, so it inherits every animation automatically.
+      if (sprite.body) sprite.body(octx, frame, sprite.skeleton);
+    }
 
     // front overlays live in full LCD space (post body-scale reset)
     octx.setTransform(ss, 0, 0, ss, 0, 0);

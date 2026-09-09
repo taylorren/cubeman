@@ -77,6 +77,34 @@ From `shared.ts`: `idle` (breathe/glance), `sleep` (lying + foot twitch),
 Every profession gets them by importing; the state machine auto-sleeps after
 60s idle and chains wake → action on any button press.
 
+### Body presentation (gender/clothing silhouettes)
+
+The skeleton is a gender-neutral stick figure. To give a profession a
+distinct **silhouette** — haircut, a skirt, an apron — add a
+`presentation?: BodyOverlay` to it:
+
+```ts
+type BodyOverlay = (ctx, frame, s: Skeleton) => void;
+```
+
+It is drawn right after the skeleton **in the same body-scale transform** and
+gets the cubeman's *current rendered pose* (already shifted to its screen
+position), so you anchor shapes to the live `head`/`hip` joints and they track
+every animation — idle sway, wandering, actions, sleep. The Botanist uses it
+for a bob with a flower clip and an A-line skirt:
+
+```ts
+const presentation: BodyOverlay = (ctx, frame, s) => {
+  hair(ctx, s.head[0], s.head[1]);   // drawn around the live head joint
+  skirt(ctx, s.hip[0], s.hip[1]);    // flared from the live hip joint
+};
+```
+
+Because it inherits the body-scale transform, it renders inside every drawing
+path automatically (main display, visits, roster chips). Everything is the
+same on-color, so it reads as a silhouette extension of the figure rather than
+a costume overlay.
+
 ### Actions
 
 ```ts

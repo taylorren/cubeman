@@ -29,6 +29,8 @@ const definitions: ResidentDefinition[] = [
   { id: 'cube-8', name: 'Pablo', professionId: 'painter', unlock: 'masterpiece' },
   { id: 'cube-10', name: 'Appleby', professionId: 'astronomer', unlock: 'stargazer' },
   { id: 'cube-12', name: 'Merlin', professionId: 'magician', unlock: 'lift-off' },
+  { id: 'cube-14', name: 'Briar', professionId: 'botanist', unlock: 'green-thumb' },
+  { id: 'cube-16', name: 'Laura', professionId: 'lawyer', unlock: 'secret-garden' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
@@ -299,10 +301,11 @@ function toyFor(cube: Cube): Toy {
     { spec: '1' },
   ];
   // SECRET COMBO: professions with a secret action (easter-egg profession
-  // unlocks) hide it behind a button sequence on their own cube —
-  // LEFT → RIGHT → MIDDLE(star) within 1.5s. With one mouse, "press and
-  // hold A then click B" is impossible (click only fires where the pointer
-  // went down), so a timed SEQUENCE is the discoverable combo.
+  // unlocks) hide it behind a button sequence on their own cube. Each secret
+  // defines its own `combo` + `comboWindow` (default LEFT→RIGHT→MIDDLE in
+  // 1.5s). With one mouse, "press and hold A then click B" is impossible
+  // (click only fires where the pointer went down), so a timed SEQUENCE is
+  // the discoverable combo. Briar's is longer/harder: LEFT→MIDDLE→RIGHT→MIDDLE.
   const secret = actions.find((a) => a.secret);
   const comboSequence: string[] = [];
   const comboTimes: number[] = [];
@@ -320,16 +323,18 @@ function toyFor(cube: Cube): Toy {
       event.stopPropagation();
       selectCube(cube);
       if (secret) {
+        const combo = secret.combo ?? ['0', '1', 'random'];
+        const window = secret.comboWindow ?? 1500;
         comboSequence.push(entry.spec);
         comboTimes.push(performance.now());
-        while (comboSequence.length > 3) {
+        while (comboSequence.length > combo.length) {
           comboSequence.shift();
           comboTimes.shift();
         }
         if (
-          comboSequence.length === 3 &&
-          comboSequence.join(',') === '0,1,random' &&
-          comboTimes[2]! - comboTimes[0]! <= 1500
+          comboSequence.length === combo.length &&
+          comboSequence.join(',') === combo.join(',') &&
+          comboTimes[comboTimes.length - 1]! - comboTimes[0]! <= window
         ) {
           comboSequence.length = 0;
           comboTimes.length = 0;
@@ -338,7 +343,9 @@ function toyFor(cube: Cube): Toy {
           // Force him idle (existing resetMovement) so the rocket actually plays.
           cubeman.resetMovement();
           cubeman.press(secret);
-          achievements.unlockById('lift-off');
+          // The secret grants its OWN achievement (Appleby: 'lift-off';
+          // Briar: 'secret-garden'), which unlocks the next profession.
+          if (secret.unlock) achievements.unlockById(secret.unlock);
           return;
         }
       }
@@ -488,7 +495,7 @@ function renderRoster(): void {
     if (cube) {
       const canvas = document.createElement('canvas');
       canvas.className = `chip-face chip-face-${profession.id}`;
-      new LCD(canvas, 48, 1).draw(sample(profession.idle, 0), 0);
+      new LCD(canvas, 48, 1).draw(sample(profession.idle, 0), 0, { body: profession.presentation });
       face = canvas;
     } else {
       face = document.createElement('span');
@@ -719,7 +726,7 @@ const loop = new Loop(
               if (c.sleeping) front = (ctx) => zzzOverlay(ctx, c.animFrame);
               // an in-progress action overlay (e.g. shower stream, tub near-wall)
               else if (overlay) front = (ctx) => overlay(ctx, c.animFrame);
-              return { skeleton: c.pose(), front };
+              return { skeleton: c.pose(), body: c.prof.presentation, front };
             }),
         front: closed ? curtainOverlay : undefined,
       });

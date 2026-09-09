@@ -8,6 +8,7 @@ import { Achievements, clearAchievementStorage } from './game/achievements';
 import { Cube, doorOpenness } from './game/cube';
 import { Cubeman } from './game/cubeman';
 import { Shelf } from './game/shelf';
+import { ShelfProgression, SHELF_TIERS, TOTAL_SLOTS } from './game/shelf-progression';
 import { VisitSession } from './game/visit';
 import { gameLog } from './core/debug';
 import { loadPlacement, savePlacement } from './game/placement-storage';
@@ -22,14 +23,14 @@ type ResidentDefinition = { id: string; name: string; professionId: string; unlo
 const definitions: ResidentDefinition[] = [
   { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
   { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
-  { id: 'cube-4', name: 'Melody', professionId: 'musician', unlock: 'jam-session' },
-  { id: 'cube-6', name: 'Sizzle', professionId: 'chef', unlock: 'culinary-arts' },
+  { id: 'cube-4', name: 'Maestro', professionId: 'musician', unlock: 'jam-session' },
+  { id: 'cube-6', name: 'Chandler', professionId: 'chef', unlock: 'culinary-arts' },
 ];
 const cubemen: Cubeman[] = [];
 const cubesById = new Map<string, Cube>();
-const shelf = new Shelf([null, null, null, null, null, null, null, null, null], cubemen, 3);
+const shelf = new Shelf(Array(TOTAL_SLOTS).fill(null), cubemen, 3);
 const shelfEl = document.getElementById('shelf')!;
-shelfEl.style.setProperty('--shelf-n', String(shelf.columns));
+shelfEl.style.setProperty('--shelf-n', '3');
 const slots = [...shelfEl.querySelectorAll<HTMLElement>('.slot[data-slot]')];
 const goalsEl = document.getElementById('goals')!;
 const rosterEl = document.getElementById('roster')!;
@@ -50,6 +51,7 @@ const achievements = new Achievements((a) => {
 });
 
 const visits: VisitSession[] = [];
+const shelfProgress = new ShelfProgression();
 
 function beginVisit(visitor: Cubeman): void {
   const host = cubemen.find((c) => c.home === visitor.cube && c !== visitor);
@@ -66,7 +68,23 @@ function beginVisit(visitor: Cubeman): void {
     });
     return;
   }
-  visits.push(new VisitSession(host, visitor, performance.now()));
+  const session = new VisitSession(host, visitor, performance.now());
+  session.onVisitEnd = (v, h) => {
+    shelfProgress.recordVisit(v.name, h.home.id);
+    const tier = shelfProgress.checkTierUp();
+    if (tier) onShelfTierUp(tier);
+    // Progress is debug-only: never surfaced in the UI.
+    console.debug('[shelf-progression]', shelfProgress.progressSummary());
+  };
+  visits.push(session);
+}
+
+function onShelfTierUp(tier: typeof SHELF_TIERS[number]): void {
+  renderShelf();
+  banner.textContent = `🎉 Shelf expanded — ${tier.name}! Now ${tier.open} open slots.`;
+  banner.hidden = false;
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => (banner.hidden = true), 3500);
 }
 
 function ensureUnlockedCubemen(): void {
@@ -273,10 +291,20 @@ function toyFor(cube: Cube): Toy {
 }
 
 function renderShelf(): void {
+  const tier = shelfProgress.current();
+  const openSet = new Set(tier.slots);
   slots.forEach((slot, i) => {
     const cube = shelf.slots[i];
-    slot.classList.toggle('slot-empty', cube === null);
+    const locked = !openSet.has(i);
+    slot.classList.toggle('slot-empty', cube === null && !locked);
+    slot.classList.toggle('slot-locked', locked);
+    slot.dataset.locked = locked ? 'true' : 'false';
     slot.classList.remove('curtained', 'drag-over');
+    if (locked) {
+      slot.replaceChildren();
+      slot.draggable = false;
+      return;
+    }
     if (cube) {
       slot.replaceChildren(toyFor(cube).element);
       // Enable drag-and-drop for rearranging cubes
@@ -395,7 +423,7 @@ function renderRoster(): void {
     box.className = 'chip-details';
     const name = document.createElement('div');
     name.className = 'chip-name';
-    name.textContent = `${definition.name} · ${profession.name}`;
+    name.textContent = `${definition.name} the ${profession.name}`;
     const note = document.createElement('div');
     note.className = 'chip-note';
     const slot = cube ? shelf.slotOf(cube) : -1;

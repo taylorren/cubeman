@@ -5,7 +5,10 @@ const STORAGE_KEY_PREFIX = 'matchman.shelf.v1';
  * profiles with different platform characteristics) each get their own id,
  * so the shelf layout is preserved per machine rather than shared.
  */
-function machineBaseId(): string {
+let cachedStorageKey: string | null = null;
+
+function machineBase(): string {
+  if (cachedStorageKey !== null) return cachedStorageKey;
   const components = [
     navigator.userAgent,
     String(screen.width),
@@ -20,28 +23,29 @@ function machineBaseId(): string {
       hash = Math.imul(hash, 0x01000193) >>> 0;
     }
   }
-  return hash.toString(16).padStart(8, '0');
+  cachedStorageKey = hash.toString(16).padStart(8, '0');
+  return cachedStorageKey;
 }
 
-let cachedStorageKey: string | null = null;
+/** A per-machine-base storage key for the given feature prefix. */
+export function machineScopedKey(prefix: string): string {
+  return `${prefix}.${machineBase()}`;
+}
 
 function storageKey(): string {
-  if (cachedStorageKey === null) {
-    const base = machineBaseId();
-    cachedStorageKey = `${STORAGE_KEY_PREFIX}.${base}`;
-    // One-time migration: layouts saved before per-machine scoping move to
-    // the machine-scoped key so existing placements are preserved.
-    try {
-      const legacy = localStorage.getItem(STORAGE_KEY_PREFIX);
-      if (legacy !== null) {
-        localStorage.setItem(cachedStorageKey, legacy);
-        localStorage.removeItem(STORAGE_KEY_PREFIX);
-      }
-    } catch (error) {
-      console.warn('Could not migrate the saved shelf layout.', error);
+  const key = machineScopedKey(STORAGE_KEY_PREFIX);
+  // One-time migration: layouts saved before per-machine scoping move to
+  // the machine-scoped key so existing placements are preserved.
+  try {
+    const legacy = localStorage.getItem(STORAGE_KEY_PREFIX);
+    if (legacy !== null) {
+      localStorage.setItem(key, legacy);
+      localStorage.removeItem(STORAGE_KEY_PREFIX);
     }
+  } catch (error) {
+    console.warn('Could not migrate the saved shelf layout.', error);
   }
-  return cachedStorageKey;
+  return key;
 }
 
 type SavedLayout = { slots: Array<string | null>; warning: string | null };

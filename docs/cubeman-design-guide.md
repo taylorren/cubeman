@@ -320,18 +320,14 @@ object. The split keeps character state and world state evolving separately:
 - **`Cube`** (`src/game/cube.ts`) — one per toy. Owns rooms and props: the
   ball belongs to the living room and rolls even when the cube is empty. The
   room on display (`currentSceneId`) belongs to the cube, not any one cubeman.
-- **`Shelf`** (`src/game/shelf.ts`) — a **2x2 row-major grid**: slots 0 and 1
-  form the top row, slots 2 and 3 the bottom row. Connections are derived
-  from grid adjacency, never scene-array ordering: left/right stay within
-  the same row; up/down move by `columns` slots. No diagonal connections or
-  wrapping across row boundaries are allowed. `neighborOf(cube, dir)` returns
-  a cube only when that adjacent slot is occupied. A
-  cube is home to one resident plus **at most one visitor**, and is **closed**
-  (curtained) while its resident is away.
+- **`Shelf`** (`src/game/shelf.ts`) — a **row-major grid** of slots. Connections
+  are derived from grid adjacency, never scene-array ordering: left/right stay
+  within the same row; up/down move by `columns` slots. No diagonal connections
+  or wrapping across row boundaries are allowed. `neighborOf(cube, dir)` returns
+  a cube only when that adjacent slot is occupied. A cube is home to one
+  resident plus **at most one visitor**, and is **closed** (curtained) while its
+  resident is away.
   `Shelf.columns` drives both neighbor lookup and the CSS column count.
-  To expand the layout later, change the column count and provide the
-  corresponding slots (3×3 is the practical ceiling given the canvas layout);
-  internal room doors remain left/right-only.
   **Multi-hop travel**: `pathTo(from, to)` searches the adjacency graph
   breadth-first (fewest hops wins; the shelf is tiny, 3×3 at most) and
   returns the legs of a route. Intermediate
@@ -339,6 +335,27 @@ object. The split keeps character state and world state evolving separately:
   inbound — you can't walk through a curtained room or through a room about to
   host a visit. The destination's acceptance is checked separately via
   `canAcceptVisitor`.
+- **`ShelfProgression`** (`src/game/shelf-progression.ts`) — the shelf is always a
+  **3×3 grid (9 slots)**. Progression unlocks more open slots as cubemen build
+  social connections through visits:
+
+  | Tier | Open | Locked | Name | Unlock condition |
+  |------|------|--------|------|------------------|
+  | 0 | 4 | 5 | Cozy Corner | Default (start) |
+  | 1 | 6 | 3 | Growing Room | 4 different rooms have each received a visitor |
+  | 2 | 7 | 2 | Social Circle | 1 cubeman has visited all other 3 |
+  | 3 | 8 | 1 | Busy Block | 2 cubemen have visited all other 3 |
+  | 4 | 9 | 0 | Grand Stage | All 4 cubemen visited all others, 10+ total visits |
+
+  Locked slots render as greyed-out placeholders with a 🔒 icon and are
+  non-interactive. The initial layout is:
+  ```
+  O O L
+  O O L
+  L L L
+  ```
+  where O = open slot, L = locked slot. When a visit completes, `checkTierUp()`
+  fires and the shelf re-renders with more slots unlocked.
 - **`Stamina`** (`src/game/stamina.ts`) — per-cubeman energy (see above).
 - **Rendering** (`src/render/lcd.ts`, `src/main.ts`) — `LCD.drawBatch`
   composites several skeletons over one shared backdrop: a cube's display

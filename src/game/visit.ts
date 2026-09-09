@@ -49,6 +49,9 @@ export class VisitSession {
   private ended = false;
   private readonly startedAt: number;
 
+  /** Called when the visit ends, for shelf progression tracking. */
+  onVisitEnd?: (visitor: Cubeman, host: Cubeman) => void;
+
   constructor(host: Cubeman, visitor: Cubeman, now: number) {
     this.host = host;
     this.visitor = visitor;
@@ -166,5 +169,6 @@ export class VisitSession {
       returnedHome: this.visitor.cube === this.visitor.home,
       elapsedMs: Math.round(performance.now() - this.startedAt),
     });
+    this.onVisitEnd?.(this.visitor, this.host);
   }
 }

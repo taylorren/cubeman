@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "sim": "node scripts/social-sim.mjs"
+    "sim": "node scripts/social-sim.mjs",
+    "sim:goto": "node scripts/goto-room-sim.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

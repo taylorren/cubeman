@@ -218,11 +218,14 @@ export const bathroom: Scene = {
   draw(ctx, frame) {
     ctx.fillRect(0, 46, 48, 2); // floor
 
-    // towel rack (top-left)
-    ctx.fillRect(6, 8, 10, 1); // rail
-    ctx.fillRect(3, 8, 1, 3); ctx.fillRect(18, 8, 1, 3); // brackets
-    ctx.fillRect(9, 8, 4, 5); // towel
-    ctx.fillRect(9, 12, 4, 1); // towel fold
+    // Ceiling-mounted 花洒, horizontally centered over the bath mat below
+    // (mat spans x8–16, so the head sits at x12): a straight pipe drops to a
+    // wide flat head. It is the SINGLE fixture up here — the falling water is
+    // drawn on the Shower action's front overlay, streaming straight off the
+    // face and raining down onto the mat/standing spot below.
+    ctx.fillRect(11, 1, 2, 5); // pipe from the ceiling (center x12)
+    ctx.fillRect(9, 6, 6, 3); // 花洒 head (wide flat face, center x12)
+    ctx.fillRect(11, 9, 2, 1); // lip the drops roll off
 
     // bath mat
     ctx.fillRect(8, 45, 8, 1);
@@ -275,12 +278,33 @@ export const wake: Anim = {
 // room-locked: they only run in the bathroom (see `room` on Action) — pressing
 // them elsewhere is a no-op, so the toy "showers" only in the tub.
 
-/** Standing under running water: arms raised, gentle bobbing and drip. */
+/** Standing right below the showerhead under running water: arms raised,
+ *  gentle bobbing, and an animated stream drawn OVER him. */
 export const shower: Action = {
   id: 'shower',
   name: 'Shower',
   effort: 4,
   room: 'bathroom',
+  stand: 12,
+  /** Recover while under the running water — ~sleep's rate (4/s). */
+  regen: 4 / 30,
+  front: (ctx, frame) => {
+    // Falling water from the spout (y≈10) down to his head/shoulders (~y26).
+    // Droplets fall in a staggered cadence over the head's columns (x11–13);
+    // over his dark body they merge silently, beside it they read as the
+    // running stream.
+    for (let i = 0; i < 4; i++) {
+      const drop = (frame + i * 6) % 18;
+      const x = 11 + (i % 3);
+      const y = 11 + drop;
+      if (y < 26) {
+        ctx.fillRect(x, y, 1, 2);
+        // a second, shorter droplet a few px below so the streak looks continuous
+        const y2 = y + 6;
+        if (y2 < 26) ctx.fillRect(x === 11 ? 13 : 11, y2, 1, 2);
+      }
+    }
+  },
   anim: {
     dur: 48,
     loop: false,
@@ -334,60 +358,123 @@ export const shower: Action = {
   },
 };
 
-/** Sitting in the tub: splash, then settle with a happy drip. */
+/** Seated IN the tub: splash, then settle. The tub's near wall + water surface
+ *  are drawn OVER him so only his head and arms peek above — reads as bathing. */
+
+// Soak poses: seated pulled-down (contact), arms resting, and a couple of
+// relaxed breathing variants so the long bath reads as settling in, not stuck.
+const tubSeated = pose({
+  head: [24, 13], neck: [24, 18], hip: [24, 27],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+});
+const tubArms = pose({
+  head: [24, 12], neck: [24, 17], hip: [24, 28],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [18, 16], hL: [14, 12], eR: [30, 16], hR: [34, 12],
+});
+const tubSplashDown = pose({
+  head: [24, 12.5], neck: [24, 17.5], hip: [24, 28],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [17, 20], hL: [13, 26], eR: [31, 20], hR: [35, 26],
+});
+const tubSplashUp = pose({
+  head: [24, 12], neck: [24, 17], hip: [24, 28],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [18, 16], hL: [13, 14], eR: [30, 16], hR: [35, 14],
+});
+const tubRelax = pose({
+  head: [24, 13], neck: [24, 18], hip: [24, 28],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [20, 22], hL: [18, 27], eR: [28, 22], hR: [30, 27],
+});
+const tubRelaxSoft = pose({
+  // breathing out — head and shoulders settle a touch deeper
+  head: [24, 13.4], neck: [24, 18.4], hip: [24, 28.5],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [20, 22], hL: [17, 27], eR: [28, 22], hR: [31, 27],
+});
+const tubRise = pose({
+  head: [24, 11], neck: [24, 16], hip: [24, 28],
+  kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
+  eL: [20, 19], hL: [16, 22], eR: [28, 19], hR: [32, 22],
+});
+
 export const bath: Action = {
   id: 'bath',
   name: 'Bath',
   effort: 3,
   room: 'bathroom',
+  /** A soak is more restorative than a shower — recovers ~8/s while immersed. */
+  regen: 8 / 30,
+  stand: 35,
+  front: (ctx, frame) => {
+    // The tub's NEAR wall sinks the bather below the water line (only his head
+    // and arms stay above it). Instead of one solid black slab, the submerged
+    // region reads as a MOSAIC of ceramic tiles — and it's ALIVE: the surface
+    // line ripples, a glint of light cascades across the tiling (like sun on
+    // water), and suds keep rising. A dark fill carved into small LCD tiles by
+    // thin white grout lines frames the bather rather than masking him.
+    const x0 = 29; // tub opening's left edge (tub lives on the right, x26-46)
+    const x1 = 45;
+    const bottom = 45;
+    // gentle breathing of the waterline — sways a pixel up and back
+    const ripple = (frame % 10) < 5 ? 1 : 0;
+    const waterY = 33 + ripple;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x0, waterY, x1 - x0 + 1, bottom - waterY + 1);
+    // carve staggered ceramic tiles with white grout (running-bond mosaic)
+    ctx.fillStyle = '#fff';
+    for (let y = waterY + 2, row = 0; y <= bottom; y += 4, row++) {
+      ctx.fillRect(x0, y, x1 - x0 + 1, 1); // grout line under this course
+      const off = (row % 2) * 2; // run a half-tile over on alternating courses
+      for (let gx = x0 + 2 + off; gx < x1; gx += 4) {
+        ctx.fillRect(gx, y, 1, Math.min(4, bottom - y + 1)); // vertical seam
+      }
+    }
+    // a glinting tile sweeps across each course, then drops to the next — a
+    // shimmer of light travelling down the tiling (water over the mosaic).
+    ctx.fillStyle = '#fff';
+    const t = frame % 120;
+    const row = Math.floor(t / 24); // which course the glint is on (0..4)
+    const sweep = (t % 24) / 24; // 0→1 across the row
+    const gy = Math.min(bottom - 1, waterY + 2 + row * 4);
+    const gx2 = Math.floor(x0 + 1 + sweep * (x1 - x0 - 4));
+    ctx.fillRect(gx2, gy, 2, 1); // one lit tile
+    ctx.fillStyle = '#000';
+    // rising suds just above the surface
+    const cycle = frame % 60;
+    for (let i = 0; i < 3; i++) {
+      const p = ((cycle / 60) + i * 0.33) % 1;
+      if (p > 0.7) continue;
+      const bx = 33 + i * 3;
+      const by = waterY - 2 - Math.round(p * 5);
+      ctx.fillRect(bx, by, 1, 1);
+      ctx.fillRect(bx + 1, by, 1, 1);
+    }
+  },
   anim: {
-    dur: 40,
+    dur: 96,
     loop: false,
     keys: [
       // climb into the tub and sit
-      {
-        t: 0,
-        pose: pose({
-          head: [24, 13], neck: [24, 18], hip: [24, 27],
-          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
-        }),
-      },
-      {
-        t: 8,
-        pose: pose({
-          head: [24, 12], neck: [24, 17], hip: [24, 28],
-          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
-          eL: [18, 16], hL: [14, 12], eR: [30, 16], hR: [34, 12],
-        }),
-      },
+      { t: 0, pose: tubSeated },
+      { t: 8, pose: tubArms },
       // splash down
-      {
-        t: 16,
-        pose: pose({
-          head: [24, 12.5], neck: [24, 17.5], hip: [24, 28],
-          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
-          eL: [17, 20], hL: [13, 26], eR: [31, 20], hR: [35, 26],
-        }),
-      },
+      { t: 16, pose: tubSplashDown },
       // splash up again
-      {
-        t: 24,
-        pose: pose({
-          head: [24, 12], neck: [24, 17], hip: [24, 28],
-          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
-          eL: [18, 16], hL: [13, 14], eR: [30, 16], hR: [35, 14],
-        }),
-      },
-      // relax
-      {
-        t: 32,
-        pose: pose({
-          head: [24, 13], neck: [24, 18], hip: [24, 28],
-          kL: [21, 34], fL: [20, 40], kR: [27, 34], fR: [28, 40],
-          eL: [20, 22], hL: [18, 27], eR: [28, 22], hR: [30, 27],
-        }),
-      },
-      { t: 40, pose: pose() },
+      { t: 24, pose: tubSplashUp },
+      // relax — settle in for a long soak (breathing gently)
+      { t: 32, pose: tubRelax },
+      { t: 40, pose: tubRelaxSoft },
+      { t: 48, pose: tubRelax },
+      { t: 56, pose: tubRelaxSoft },
+      { t: 64, pose: tubRelax },
+      { t: 72, pose: tubRelaxSoft },
+      { t: 80, pose: tubRelax },
+      // start to rise out of the water
+      { t: 88, pose: tubRise },
+      // stand up, done
+      { t: 96, pose: pose() },
     ],
   },
 };

@@ -1,10 +1,11 @@
 /**
- * Hidden energy budget — the cubeman's self-directed life spends it;
- * ONLY sleep regenerates it. Deliberately invisible on screen: the player
- * reads tiredness through behavior (fewer tricks, shorter strolls, flopping),
- * never through a bar. User presses always perform — stamina only shapes
- * autonomous behavior. ONE INSTANCE PER CUBEMAN: energy budgets are fully
- * independent, even when one cubeman visits another's cube.
+ * Hidden energy budget — the cubeman's self-directed life spends it; ONLY
+ * SLEEP (the main channel) and therapeutic actions like shower/bath regenerate
+ * it. Deliberately invisible on screen: the player reads tiredness through
+ * behavior (fewer tricks, shorter strolls, flopping), never through a bar.
+ * User presses always perform — stamina only shapes autonomous behavior.
+ * ONE INSTANCE PER CUBEMAN: energy budgets are fully independent, even when
+ * one cubeman visits another's cube.
  */
 
 export const STAMINA = {

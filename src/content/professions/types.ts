@@ -47,6 +47,21 @@ export interface Action {
    *  home cube), e.g. `'bathroom'` for shower/bath. Outside that room the
    *  action is ignored — it "only happens" there. */
   room?: string;
+  /** The body-center SCREEN x this action is performed AT, e.g. a bathroom
+   *  fixture: the cubeman snaps to this spot when the action starts, so it
+   *  always lines up with the scenery drawn around it. Used by the shower
+   *  (standing under the head) and the bath (seated inside the tub). When
+   *  omitted the cubeman performs wherever it happens to stand. */
+  stand?: number;
+  /** Front overlay — drawn in FULL 48x48 LCD space OVER this cubeman while
+   *  the action plays (the same channel as the Zzz sleep overlay), so it can
+   *  occlude or streak in front of the skeleton. The shower uses it for falling
+   *  water; the bath uses it for the tub's near wall + water surface. */
+  front?: Overlay;
+  /** Stamina recovered PER TICK while this action plays (default none). Lets
+   *  therapeutic actions like shower/bath feed the energy budget in addition
+   *  to sleep — a soak regens faster than an ordinary shower. */
+  regen?: number;
 }
 
 /**

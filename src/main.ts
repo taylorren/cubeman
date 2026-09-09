@@ -109,6 +109,15 @@ const debugControls = {
     visits: visits.map((v) => v.debugState()),
     layout: shelf.slots.map((cube) => cube?.id ?? null),
   }),
+  /** Order a cubeman to walk to one of its rooms, e.g.
+   *  `cubemanDebug.goToRoom('Sticko', 'bathroom')`. Room matches by id or name. */
+  goToRoom(name: string, room: string): string {
+    const cubeman = cubemen.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (!cubeman) {
+      return `Unknown cubeman "${name}". Known: ${cubemen.map((c) => c.name).join(', ')}.`;
+    }
+    return cubeman.goToRoom(room);
+  },
 };
 
 declare global {
@@ -547,10 +556,14 @@ const loop = new Loop(
         },
         sprites: closed
           ? []
-          : occupants.map((c) => ({
-              skeleton: c.pose(),
-              front: c.sleeping ? (ctx, _f) => zzzOverlay(ctx, c.animFrame) : undefined,
-            })),
+          : occupants.map((c) => {
+              const overlay = c.actionOverlay;
+              let front: Overlay | undefined;
+              if (c.sleeping) front = (ctx) => zzzOverlay(ctx, c.animFrame);
+              // an in-progress action overlay (e.g. shower stream, tub near-wall)
+              else if (overlay) front = (ctx) => overlay(ctx, c.animFrame);
+              return { skeleton: c.pose(), front };
+            }),
         front: closed ? curtainOverlay : undefined,
       });
     }

@@ -2,7 +2,7 @@ import { animExtent, sample, shiftX, shiftY } from '../render/skeleton';
 import type { Anim } from '../render/skeleton';
 import { LCD } from '../render/lcd';
 import * as shared from '../content/professions/shared';
-import type { Action, Profession } from '../content/professions';
+import type { Action, Overlay, Profession } from '../content/professions';
 import { GRACE_MS, STAMINA, Stamina } from './stamina';
 import type { Cube } from './cube';
 import type { Dir, Shelf } from './shelf';
@@ -249,6 +249,14 @@ export class Cubeman {
     // living room is ignored, so it "only happens" in the bathroom.
     if (action.room && this.currentRoom !== action.room) {
       this.log('action.rejected', { action: action.id, requiredRoom: action.room, room: this.currentRoom });
+      return;
+    }
+    // fixture actions (action.stand set, e.g. shower/bath in the bathroom):
+    // perform AT that fixture spot. Snap there so the action's front overlay
+    // (water stream, tub near-wall) always lines up with the skeleton.
+    if (action.stand !== undefined) {
+      if (Math.abs(this.cx() - action.stand) > 1) this.x = this.cxToTarget(action.stand);
+      this.startAction(action, spontaneous);
       return;
     }
     const [lo, hi] = this.safeBand(action);
@@ -745,6 +753,29 @@ export class Cubeman {
     this.beginReturnHome(() => this.routeToBed());
   }
 
+  /** Programmatic/debug directive: send this cubeman to one of ITS rooms (a
+   *  scene of its home cube, matched by id or name — e.g. 'bathroom' or
+   *  'Bathroom'). If it is away on a visit it returns home first, then walks
+   *  to the room. Cancels any activity in progress so the order takes effect.
+   *  Returns a human-readable status line (used by the console `goToRoom`). */
+  goToRoom(roomId: string): string {
+    const scenes = this.home.prof.scenes;
+    const wanted = roomId.toLowerCase();
+    const target =
+      scenes.find((s) => s.id.toLowerCase() === wanted) ??
+      scenes.find((s) => s.name.toLowerCase() === wanted);
+    if (!target) {
+      return `"${this.name}" has no room matching \"${roomId}\". ` +
+        `Available: ${scenes.map((s) => `${s.id} (${s.name})`).join(', ')}.`;
+    }
+    this.log('debug.goto-room', { room: target.id, roomName: target.name });
+    this.resetMovement(); // force-cancel current action/walk so the order holds
+    // goToRoom works from anywhere: leave any visit and head home, then the
+    // final leg walks from the home hub to the requested room.
+    this.beginReturnHome(() => this.travelTo(target.id, () => this.backToIdle()));
+    return `Sent "${this.name}" to "${target.name}" (${target.id}).`;
+  }
+
   /** Travel to the bedroom and lie down on the bed. Shared by the visit
    *  tired-return and the normal bedtime routing. */
   private routeToBed(): void {
@@ -764,8 +795,10 @@ export class Cubeman {
   /** One fixed-timestep update: autonomous life, movement, recovery. */
   tick(): void {
     this.frame++;
-    // sleep is the ONLY recovery channel
+    // sleep is the PRIMARY recovery channel; a therapeutic action in progress
+    // (shower/bath) also regens energy at its own rate while it plays.
     if (this.mode.anim === this.prof.sleep) this.stamina.regen(STAMINA.REGEN_PER_TICK);
+    else if (this.mode.action?.regen !== undefined) this.stamina.regen(this.mode.action.regen);
 
     // ladder travel: climb out of this cube, swap at the ceiling/floor,
     // climb into the destination, then hand control back to walking
@@ -913,6 +946,13 @@ export class Cubeman {
   /** This cubeman's own animation clock (for per-cubeman overlay timing). */
   get animFrame(): number {
     return this.frame;
+  }
+
+  /** Front overlay of the in-progress action (e.g. the shower stream, the tub's
+   *  near wall) — rendered over this cubeman while the action plays. Null when
+   *  there is none (idling, walking, sleeping, etc.). */
+  get actionOverlay(): Overlay | null {
+    return this.mode.action?.front ?? null;
   }
 
   /** The cubeman's current rendered pose, shifted to its screen position.

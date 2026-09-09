@@ -85,6 +85,45 @@ Every profession gets them by importing; the state machine auto-sleeps after
 
 Name actions by their personality, not just mechanics ("Cheeky Wave" > "Wave").
 
+Full `Action` shape (`src/content/professions/types.ts`):
+
+```ts
+interface Action {
+  id: string; name: string;
+  anim: Anim;                 // one-shot (loop: false)
+  effort?: number;            // stamina cost, drives autonomous trick selection (default 8)
+  room?: string;              // restrict to a scene id (e.g. 'bathroom') — a no-op elsewhere
+  stand?: number;             // body-center SCREEN x to snap to before the animation plays
+  front?: Overlay;            // LCD-space overlay drawn OVER the cubeman while it plays
+  regen?: number;             // stamina recovered per tick while playing (sleep is the main channel)
+}
+```
+
+Special fields used by the shared bathroom actions (import `shower`/`bath` from
+`shared.ts` — they live in every cube):
+
+- **`stand`** — fixture actions perform *at* a fixed spot so the overlay lines up
+  with the scenery (the shower head, the tub). The cubeman snaps to `stand`
+  before the animation starts; afterwards it strolls back out under its own
+  wander logic.
+- **`front`** — a per-sprite overlay drawn in full 48×48 LCD space *over* this
+  cubeman while the action plays (the same channel as the sleep "Z z z").
+  It can occlude or streak across the skeleton without touching the shared
+  backdrop or other occupants:
+  - the **shower** (`stand` under the head) streams animated falling water
+    straight off the showerhead onto him;
+  - the **bath** (`stand` in the tub) sinks him with a *living ceramic-tile
+    mosaic* (a white-grout running bond carving a dark fill into staggered LCD
+    tiles) so his lowered body reads as submerged tiling rather than a solid
+    black mask — drift of the water line, a glint of light cascading down the
+    tiles, and rising suds keep it animated. Its soak is intentionally LONG
+    (~96 frames) and reads as: climb in → splash → settle → breathe gently —
+    then Rise & stand out.
+  - **Bath & shower also restore stamina** (`regen` per tick) while they play —
+    a second recovery channel alongside sleep. Sleep remains the main charge;
+    a therapeutic soak (bath, `regen: 8/30`) refills faster than a shower
+    (`regen: 4/30`), making a trip to the bathroom a real refuel.
+
 ### Scenes (ambience per room)
 
 ```ts
@@ -192,6 +231,12 @@ one of its own `actions` every 6–14 seconds. Consequences for content:
   furniture still allow standing/idling. Intentional room-crossing walks off
   the screen edge are exempt — they use `startWalkTo` directly, not
   `runAction`.
+- **Room-locked + fixture actions**: an action with `room` set (shower/bath)
+  only plays *in* that room — elsewhere the press is a no-op (`action.rejected`
+  is logged). An action with `stand` set snaps the cubeman to that fixture
+  spot before playing (bypassing the center-stage band), because its `front`
+  overlay is authored to align with scenery there. Both checks live in
+  `runAction`, shared by user and spontaneous triggers.
 
 ## Ambience & props
 
@@ -221,6 +266,11 @@ Walking off an edge hard-cuts to the adjacent room (entering from the
 opposite side) — the same handoff P2 uses between cubes.
 
 - Stickman's cube: **living room (hub) ⇄ bedroom ⇄ bathroom**.
+- The **bathroom** keeps one clear water fixture up top — a ceiling-mounted
+  花洒 directly above where the cubeman stands to shower — plus the bathtub on
+  the right (declared a `solid`) and a bath mat. Avoid clustering several
+  similar small shapes near one another (they started blurring together on the
+  48px grid); a single readable fixture reads better than two ambiguous ones.
 - Nap time routes through the graph: travel to the bedroom, walk to the
   `sleepSpot`, then sleep there. Room states (ball position) persist per
   scene; dynamic props draw only in their own room.
@@ -276,6 +326,9 @@ object. The split keeps character state and world state evolving separately:
   composites several skeletons over one shared backdrop: a cube's display
   draws its current room, then **every** cubeman standing in it (resident +
   visitor, i.e. shared-room occupancy). A closed cube draws a curtain instead.
+  Each sprite may carry its **own `front` overlay** (full 48×48 LCD space,
+  drawn *over* just that cubeman) — used for the sleep "Z z z" and for
+  in-progress action effects like the shower's water and the bath's tub wall.
   Cross-cube travel is animated as **room scenery driven by the CUBE**:
   `doorFx` (a doorway in the exit/entry side wall that opens, holds, closes)
   and `ladderOn` (the ceiling/floor hatch ladder, shown while a cubeman
@@ -348,6 +401,7 @@ Browser console commands:
 
 ```js
 window.cubemanDebug.snapshot() // current cubemen and active visits, even when logging is off
+window.cubemanDebug.goToRoom('Sticko', 'bathroom') // order a cubeman to walk to one of its rooms (id or name)
 copy(window.cubemanDebug.export()) // copy the latest 500 events as JSON (DevTools helper)
 await window.cubemanDebug.flush() // wait for outstanding disk writes; rejects on failed delivery
 window.cubemanDebug.status() // pending/written/failed counts and the latest delivery error

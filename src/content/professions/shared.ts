@@ -144,7 +144,7 @@ export function rectOutline(
  * The SHARED living-room arrangement. Every profession's hub room has the
  * same id and the same edges — same toy layout, same way to reach the
  * bedroom and neighbor cubes — but each profession supplies its OWN ambience
- * draw, so the room reads differently (Stickman: cozy window & plant;
+ * draw, so the room reads differently (Sportsman: cozy window & plant;
  * Dancer: a little studio), while the underlying arrangement never changes.
  * Pass the profession's draw and you get a Scene with the fixed topology.
  */
@@ -211,7 +211,10 @@ export const bedroom: Scene = {
 export const meditation: Action = {
   id: 'meditation',
   name: 'Meditation',
-  room: 'bedroom',
+  room: ['bedroom', 'bathroom'],
+  /** Never button-assigned and never in the Surprise pool — it only happens
+   *  on its own while wandering (per the design rule). */
+  spontaneousOnly: true,
   effort: 2,
   /** A quiet sit recovers gently — more than standing, between shower and bath. */
   regen: 6 / 30,

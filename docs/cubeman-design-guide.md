@@ -223,7 +223,7 @@ self-directed behavior respects the budget. Target balance: **~2–3 minutes of
 awake life per nap, 15–20s naps**. Stamina changes personality *before* it
 interrupts activity.
 
-- **Spending**: per-action `effort` (Stickman: backflip 8, cartwheel 6, wave 2;
+- **Spending**: per-action `effort` (Sportsman: backflip 8, cartwheel 6, wave 2;
   default 8), ball kick 2, walking 0.05 per screen pixel, room crossing 0.5.
 - **Recovery**: **sleep is the ONLY recovery channel** — 4/s of sleep
   (bed: 25→90 in ~16s; flop: 8→55 in ~12s). Standing around regenerates
@@ -291,7 +291,7 @@ comfort item + 1 living element**, plus at most one passive scenic item
 (e.g. a window). Thin details die in thresholding — design props as
 recognizable silhouettes.
 
-- **Interactive prop** (e.g. Stickman's ball): state lives in the game
+- **Interactive prop** (e.g. Sportsman's ball): state lives in the game
   (`main.ts`), drawn in the `behind` pass after ambience; idle may trigger a
   prop behavior (walk over, nudge; prop has its own simple physics).
 - **Comfort item** (bed): declared as `Ambience.sleepSpot { x1, x2, cx }` —
@@ -311,7 +311,7 @@ Every room declares typed edges — `scene` (internal door), `neighbor`
 Walking off an edge hard-cuts to the adjacent room (entering from the
 opposite side) — the same handoff P2 uses between cubes.
 
-- Stickman's cube: **living room (hub) ⇄ bedroom ⇄ bathroom**.
+- Sportsman's cube: **living room (hub) ⇄ bedroom ⇄ bathroom**.
 - The **bathroom** keeps one clear water fixture up top — a ceiling-mounted
   花洒 directly above where the cubeman stands to shower — plus the bathtub on
   the right (declared a `solid`) and a bath mat. Avoid clustering several
@@ -343,7 +343,7 @@ object. The split keeps character state and world state evolving separately:
 - **`Cubeman`** (`src/game/cubeman.ts`) — one per character. Owns animation
   mode, position (`x`), stamina, timers, sleep, and the `home` cube. Its
   *current* cube is tracked separately from `home`, so visiting never changes
-  ownership. Two `Cubeman` instances (Sticko & Pip) each use the Stickman
+  ownership. Two `Cubeman` instances (Sam & Pip) each use the Sportsman
   profession for now.
 - **`Cube`** (`src/game/cube.ts`) — one per toy. Owns rooms and props: the
   ball belongs to the living room and rolls even when the cube is empty. The
@@ -464,7 +464,7 @@ Browser console commands:
 
 ```js
 window.cubemanDebug.snapshot() // current cubemen and active visits, even when logging is off
-window.cubemanDebug.goToRoom('Sticko', 'bathroom') // order a cubeman to walk to one of its rooms (id or name)
+window.cubemanDebug.goToRoom('Sam', 'bathroom') // order a cubeman to walk to one of its rooms (id or name)
 copy(window.cubemanDebug.export()) // copy the latest 500 events as JSON (DevTools helper)
 await window.cubemanDebug.flush() // wait for outstanding disk writes; rejects on failed delivery
 window.cubemanDebug.status() // pending/written/failed counts and the latest delivery error

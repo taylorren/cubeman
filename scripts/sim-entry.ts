@@ -19,7 +19,7 @@ export function createWorld() {
     new Cube('cube-1', professions.stickman),
     new Cube('cube-2', professions.dancer),
   ];
-  const names = ['Sticko', 'Dizzy', 'Flip'];
+  const names = ['Sam', 'Dorian', 'Flip'];
   let session: { host: Cubeman; visitor: Cubeman } | null = null;
   let sessionEndsAt = 0;
   const stats = { visits: 0, multiHop: 0, violations: 0 };

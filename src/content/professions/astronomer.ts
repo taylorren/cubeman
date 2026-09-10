@@ -212,7 +212,7 @@ const rocketLaunch: Action = {
   id: 'rocket-launch',
   name: 'Rocket Launch',
   room: 'living',
-  effort: 6,
+  effort: 4,
   secret: true,
   unlock: 'lift-off',
   sound: 'rocket',

@@ -135,9 +135,9 @@ const cheekyWave: Action = {
 };
 
 /**
- * Stickman's living room: a cozy front room with a window (pulsing sun), a
+ * Sportsman's living room: a cozy front room with a window (pulsing sun), a
  * swaying potted plant, and the ball he kicks around. Same arrangement as
- * every profession's hub — Stickman just makes it his own.
+ * every profession's hub — Sportsman just makes it his own.
  */
 const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
   // floor — the bottom rim of the screen itself
@@ -174,7 +174,7 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 
 export const stickman: Profession = {
   id: 'stickman',
-  name: 'Stickman',
+  name: 'Sportsman',
   maxStamina: 150,
   actions: [backflip, cartwheel, cheekyWave, shower, bath, meditation], // ← add new actions here to expand
   idle,

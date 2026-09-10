@@ -41,7 +41,7 @@ const symphony5: Action = {
   id: 'symphony-5',
   name: 'Symphony No. 5',
   room: 'living',
-  effort: 5,
+  effort: 4,
   sound: 'symphony5',
   anim: {
     dur: 72,
@@ -98,7 +98,7 @@ const airGuitar: Action = {
   id: 'air-guitar',
   name: 'Air Guitar',
   room: 'living',
-  effort: 4,
+  effort: 5,
   sound: 'airGuitar',
   anim: {
     dur: 84,

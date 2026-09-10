@@ -39,7 +39,7 @@ pnpm preview    # serve the production build
 
 ## How to play
 
-You are given a shelf and one roommate, **Sticko**. Everything else is earned.
+You are given a shelf and one roommate, **Sam**. Everything else is earned.
 
 ### The shelf & the cubes
 
@@ -86,10 +86,10 @@ a unique set of actions and a themed room.
 
 | Resident | Profession | How to unlock |
 | --- | --- | --- |
-| Sticko | Stickman | Available from the start |
-| Dizzy | Dancer | 10 actions |
-| Maestro | Musician | 20 actions |
-| Chandler | Chef | 30 actions |
+| Sam | Sportsman | Available from the start |
+| Dorian | Dancer | 10 actions |
+| Miles | Musician | 20 actions |
+| Chester | Chef | 30 actions |
 | Pablo | Painter | 40 actions |
 | Appleby | Astronomer | 50 actions |
 | Merlin | Magician | *A secret on Appleby's cube…* |
@@ -128,5 +128,5 @@ cubemanDebug.resetProgress()
 ```
 
 This wipes achievements, shelf tier, and placed layout, then reloads — leaving
-you with just Sticko in the 2×2 corner. Other handy commands live on
+you with just Sam in the 2×2 corner. Other handy commands live on
 `cubemanDebug` (`progress()`, `goToRoom(name, room)`, `snapshot()`, `audio()`).

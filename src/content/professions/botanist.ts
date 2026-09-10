@@ -61,7 +61,7 @@ const water: Action = {
   id: 'water-beds',
   name: 'Water the Beds',
   room: 'living',
-  effort: 3,
+  effort: 2,
   anim: {
     dur: 72,
     loop: false,
@@ -130,7 +130,7 @@ const snip: Action = {
   id: 'snip-a-snap',
   name: 'Snip-a-Snap',
   room: 'living',
-  effort: 4,
+  effort: 3,
   anim: {
     dur: 66,
     loop: false,
@@ -187,7 +187,7 @@ const sunrise: Action = {
   id: 'morning-sun',
   name: 'Morning Sun',
   room: 'living',
-  effort: 2,
+  effort: 4,
   anim: {
     dur: 78,
     loop: false,
@@ -251,7 +251,7 @@ const superbloom: Action = {
   // with a left-double and a right bookend — no intuitive sweep to stumble into.
   combo: ['0', '0', '1', 'random', '1'],
   comboWindow: 3000,
-  effort: 6,
+  effort: 5,
   anim: {
     dur: 88,
     loop: false,
@@ -377,6 +377,7 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const botanist: Profession = {
   id: 'botanist',
   name: 'Botanist',
+  gender: 'lady',
   maxStamina: 120,
   presentation,
   actions: [water, snip, sunrise, superbloom, shower, bath, meditation],

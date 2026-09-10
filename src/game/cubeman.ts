@@ -202,7 +202,7 @@ export class Cubeman {
   private pickAction(pool: Action[]): Action | undefined {
     // only offer actions usable in the current room (room-locked actions
     // like shower/bath are hidden until the cubeman is in the bathroom)
-    const usable = pool.filter((a) => !a.room || a.room === this.currentRoom);
+    const usable = pool.filter((a) => Cubeman.roomOk(a, this.currentRoom));
     if (usable.length === 0) return undefined;
     const tired = this.stamina.get() < STAMINA.TIRED;
     if (!tired) return usable[Math.floor(Math.random() * usable.length)]!;
@@ -217,9 +217,18 @@ export class Cubeman {
 
   /** All the profession's actions the cubeman could perform right now —
    *  room-locked ones are excluded until the cubeman is in that room, and
-   *  SECRET ones never enter the normal pool (they fire via a hidden combo). */
+   *  SECRET ones never enter the normal pool (they fire via a hidden combo).
+   *  Spontaneous-only actions (Meditation) are excluded too: buttons and the
+   *  Surprise star never trigger them — they happen on their own. */
   actionsInCurrentRoom(): Action[] {
-    return this.prof.actions.filter((a) => !a.secret && (!a.room || a.room === this.currentRoom));
+    return this.prof.actions.filter(
+      (a) => !a.secret && !a.spontaneousOnly && Cubeman.roomOk(a, this.currentRoom),
+    );
+  }
+
+  /** Is the action allowed in this room? (`room` may list several rooms.) */
+  static roomOk(a: Action, room: string): boolean {
+    return !a.room || (typeof a.room === 'string' ? a.room === room : a.room.includes(room));
   }
 
   /** The id of the room the cubeman currently stands in. */
@@ -256,7 +265,7 @@ export class Cubeman {
   private runAction(action: Action, spontaneous = false): void {
     // room-locked actions only run in their room — a shower while in the
     // living room is ignored, so it "only happens" in the bathroom.
-    if (action.room && this.currentRoom !== action.room) {
+    if (action.room && !Cubeman.roomOk(action, this.currentRoom)) {
       this.log('action.rejected', { action: action.id, requiredRoom: action.room, room: this.currentRoom });
       return;
     }

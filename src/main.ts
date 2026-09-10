@@ -22,10 +22,10 @@ gameLog.setEnabled(new URLSearchParams(window.location.search).get('debug') !== 
 
 type ResidentDefinition = { id: string; name: string; professionId: string; unlock?: string };
 const definitions: ResidentDefinition[] = [
-  { id: 'cube-0', name: 'Sticko', professionId: 'stickman' },
-  { id: 'cube-2', name: 'Dizzy', professionId: 'dancer', unlock: 'warmed-up' },
-  { id: 'cube-4', name: 'Maestro', professionId: 'musician', unlock: 'jam-session' },
-  { id: 'cube-6', name: 'Chandler', professionId: 'chef', unlock: 'culinary-arts' },
+  { id: 'cube-0', name: 'Sam', professionId: 'stickman' },
+  { id: 'cube-2', name: 'Dorian', professionId: 'dancer', unlock: 'warmed-up' },
+  { id: 'cube-4', name: 'Miles', professionId: 'musician', unlock: 'jam-session' },
+  { id: 'cube-6', name: 'Chester', professionId: 'chef', unlock: 'culinary-arts' },
   { id: 'cube-8', name: 'Pablo', professionId: 'painter', unlock: 'masterpiece' },
   { id: 'cube-10', name: 'Appleby', professionId: 'astronomer', unlock: 'stargazer' },
   { id: 'cube-12', name: 'Merlin', professionId: 'magician', unlock: 'lift-off' },
@@ -144,7 +144,7 @@ const debugControls = {
   flush: () => gameLog.flush(),
   /** Wipe ALL persisted state (achievements → goals and cubeman unlocks;
    *  shelf tier → slot availability; shelf layout → placement) and reload,
-   *  so a fresh session starts with only Sticko on a 2×2 Cozy Corner. */
+   *  so a fresh session starts with only Sam on a 2×2 Cozy Corner. */
   resetProgress(): void {
     clearAchievementStorage();
     clearShelfProgressionStorage();
@@ -164,7 +164,7 @@ const debugControls = {
   /** Audio subsystem state — useful when the Musician seems silent. */
   audio: () => audioState(),
   /** Order a cubeman to walk to one of its rooms, e.g.
-   *  `cubemanDebug.goToRoom('Sticko', 'bathroom')`. Room matches by id or name. */
+   *  `cubemanDebug.goToRoom('Sam', 'bathroom')`. Room matches by id or name. */
   goToRoom(name: string, room: string): string {
     const cubeman = cubemen.find((c) => c.name.toLowerCase() === name.toLowerCase());
     if (!cubeman) {
@@ -269,12 +269,21 @@ function storeCube(cube: Cube): void {
 function triggerFor(cubeman: Cubeman, spec: string): void {
   if (spec === 'random') {
     // Surprise picks among the actions usable where the cubeman is now
-    // (room-locked actions like shower/bath only enter the pool in the bathroom)
+    // (room-locked actions like shower/bath only enter the pool in the
+    // bathroom; spontaneous-only and SECRET actions never enter the pool)
     const pool = cubeman.actionsInCurrentRoom();
-    cubeman.press(pool[Math.floor(Math.random() * pool.length)]!);
+    const action = pool[Math.floor(Math.random() * pool.length)];
+    if (action) cubeman.press(action);
     return;
   }
-  const action = cubeman.prof.actions[Number(spec)];
+  // Button slots are EFFORT-ordered per room (design Table 1): slot 0 is the
+  // cheapest doable action here, slot 1 the next — so the Left button is
+  // always the safe low-cost action and the Right one the harder follow-up,
+  // whichever room the cubeman stands in.
+  const slots = cubeman
+    .actionsInCurrentRoom()
+    .sort((a, b) => (a.effort ?? 8) - (b.effort ?? 8));
+  const action = slots[Number(spec)];
   if (action) cubeman.press(action);
 }
 
@@ -311,17 +320,26 @@ function toyFor(cube: Cube): Toy {
   const comboTimes: number[] = [];
   for (const entry of layout) {
     const isRandom = entry.spec === 'random';
-    const action = isRandom ? undefined : actions[Number(entry.spec)];
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'btn' + (isRandom ? ' btn-star' : '');
     button.value = entry.spec;
-    button.setAttribute('aria-label',
-      `${cubeman.name}: ${action ? action.name : 'Surprise (one of all actions)'}`);
-    button.title = action?.name ?? 'Surprise';
+    // Slot buttons resolve dynamically per room (cheapest-first), so the
+    // label reflects whatever the button WILL do right now; refreshed on click.
+    const label = () => {
+      if (isRandom) return 'Surprise (one of all actions)';
+      const slots = cubeman
+        .actionsInCurrentRoom()
+        .sort((a, b) => (a.effort ?? 8) - (b.effort ?? 8));
+      return slots[Number(entry.spec)]?.name ?? '—';
+    };
+    button.setAttribute('aria-label', `${cubeman.name}: ${label()}`);
+    button.title = label();
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       selectCube(cube);
+      button.title = label();
+      button.setAttribute('aria-label', `${cubeman.name}: ${label()}`);
       if (secret) {
         const combo = secret.combo ?? ['0', '1', 'random'];
         const window = secret.comboWindow ?? 1500;

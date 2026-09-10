@@ -19,7 +19,7 @@ const LIST: Achievement[] = [
   {
     id: 'triple-threat',
     name: 'Triple Threat',
-    desc: 'Try every action Stickman knows',
+    desc: 'Try every action Sportsman knows',
     test: (c) => Object.keys(c).length >= 3,
   },
   {
@@ -104,6 +104,12 @@ const LIST: Achievement[] = [
     id: 'secret-garden',
     name: 'Secret Garden',
     desc: 'Briar knows a secret — try the buttons on her cube…',
+    hidden: true,
+  },
+  {
+    id: 'flight',
+    name: 'Flight',
+    desc: 'Merlin knows a secret — try the buttons on his cube…',
     hidden: true,
   },
 ];

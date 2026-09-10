@@ -53,10 +53,11 @@ export interface Action {
   anim: Anim;
   /** Stamina cost — drives autonomous trick selection (default 8). */
   effort?: number;
-  /** Restrict the action to a specific room (a scene id in the profession's
-   *  home cube), e.g. `'bathroom'` for shower/bath. Outside that room the
-   *  action is ignored — it "only happens" there. */
-  room?: string;
+  /** Restrict the action to specific room(s) (scene ids in the profession's
+   *  home cube), e.g. `'bathroom'` for shower/bath, `['bedroom', 'bathroom']`
+   *  for Meditation. Outside those rooms the action is ignored — it "only
+   *  happens" there. Omit for room-agnostic actions. */
+  room?: string | string[];
   /** The body-center SCREEN x this action is performed AT, e.g. a bathroom
    *  fixture: the cubeman snaps to this spot when the action starts, so it
    *  always lines up with the scenery drawn around it. Used by the shower
@@ -79,6 +80,9 @@ export interface Action {
    *  play — they only fire via a hidden input combo. Used as profession
    *  unlock easter eggs. */
   secret?: boolean;
+  /** SPONTANEOUS-ONLY actions (e.g. Meditation) never enter the button or
+   *  Surprise pools — they only play in autonomous wandering mode. */
+  spontaneousOnly?: boolean;
   /** When `secret`, the achievement id this action's hidden-combo UNLOCKS
    *  (e.g. `'lift-off'`). Lets each profession's secret grant its own
    *  achievement instead of a fixed one. */
@@ -100,6 +104,9 @@ export interface Action {
 export interface Profession {
   id: string;
   name: string;
+  /** Body presentation variant for shared gendered actions (bedroom
+   *  grooming/dressing). Omit for the neutral (gent by default) figure. */
+  gender?: 'lady' | 'gent';
   actions: Action[];
   /** Shared behaviors applied to every profession. */
   idle: Anim;

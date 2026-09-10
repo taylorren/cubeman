@@ -183,7 +183,7 @@ button:focus-visible {
       Chef       Red       #b91c1c   0°       (1)
       Musician   Orange    #c2410c   ~25°     (2)
       Lawyer     Leather   #a9742f   ~38°     (3)
-      Stickman   Green     #15803d   ~145°    (4)
+      Sportsman   Green     #15803d   ~145°    (4)
       Astronomer Teal      #0f766e   ~180°    (5)
       Painter    Blue      #274bb0   ~225°    (6)
       Dancer     Purple    #7640a8   ~276°    (7)
@@ -338,7 +338,7 @@ button:focus-visible {
     0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
-/* Stickman profession: green buttons to match the frame */
+/* Sportsman profession: green buttons to match the frame */
 .cube-stickman .btn {
   background: linear-gradient(#22a355, #15803d 60%, #116b32);
   box-shadow:
@@ -690,7 +690,7 @@ button:focus-visible {
     0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
-/* Avatar frame matches the cube's frame color per profession (Stickman
+/* Avatar frame matches the cube's frame color per profession (Sportsman
    cubes are green-framed, the Dancer cube is purple-framed, the Musician
    cube is amber-framed, the Chef cube is red-framed, the Painter cube is
    blue-framed, and the Botanist cube is rose-framed). */

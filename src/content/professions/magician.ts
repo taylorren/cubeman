@@ -1,4 +1,5 @@
-import { pose } from '../../render/skeleton';
+import { pose, rot, shiftY } from '../../render/skeleton';
+import type { Skeleton } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
 import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
 
@@ -154,65 +155,57 @@ const rabbitHat: Action = {
 };
 
 /**
- * Levitation — rise off the floor, hang there moon-walking the arms, and
- * settle back down like nothing happened.
+ * Levitation — Merlin rises HIGH into the air while slowly spinning a full
+ * 360° (a float-and-turn anyone *could* do — only a magician thinks of it),
+ * hangs inverted at the apex for a serene bob, then settles back onto his
+ * toes facing front, like nothing happened.
  */
+
+/** Serene floating pose: arms swept out and slightly down, legs together. */
+const floatPose = pose({
+  eL: [18, 17], hL: [15, 22],
+  eR: [30, 17], hR: [33, 22],
+});
+
+/** The float pose rotated `deg` around its middle, lifted `dy` off the floor
+ *  (dy negative = up). Built from the helpers so the spin stays perfectly
+ *  rigid — the whole figure pivots as one. */
+const spinAt = (deg: number, dy: number): Skeleton => shiftY(rot(floatPose, deg, 24, 26), dy);
+
 const levitate: Action = {
   id: 'levitate',
   name: 'Levitation',
   room: 'living',
-  effort: 5,
+  effort: 4,
+  // SECRET: hidden from buttons/Surprise — fires only via the button combo
+  // (default LEFT → RIGHT → MIDDLE within 1.5s) on Merlin's own cube.
+  secret: true,
+  unlock: 'flight',
   anim: {
-    dur: 96,
+    dur: 126,
     loop: false,
     keys: [
       { t: 0, pose: pose() },
-      // mystical arm sweep
+      // gather — arms sweep up, toes just leave the floor
       {
-        t: 10,
+        t: 12,
         pose: pose({
-          head: [24, 8.5], neck: [24, 13.5],
-          eR: [28, 14], hR: [31, 10],
-          eL: [20, 14], hL: [17, 10],
+          head: [24, 7.5], neck: [24, 12.5],
+          eL: [19, 12], hL: [16, 8],
+          eR: [29, 12], hR: [32, 8],
+          kL: [21, 31], fL: [20, 38.5], kR: [27, 31], fR: [28, 38.5],
         }),
       },
-      // LIFT OFF the ground (whole pose shifted up, toes pointed)
-      {
-        t: 26,
-        pose: pose({
-          head: [24, 5], neck: [24, 10], hip: [24, 20.5],
-          kL: [21, 25], fL: [21, 34], kR: [27, 25], fR: [27, 34],
-          eL: [20, 15], hL: [16, 19], eR: [28, 15], hR: [32, 19],
-        }),
-      },
-      // hang there — arms wide, serene
-      {
-        t: 44,
-        pose: pose({
-          head: [24, 4.5], neck: [24, 9.5], hip: [24, 20],
-          kL: [21, 24.5], fL: [21, 33.5], kR: [27, 24.5], fR: [27, 33.5],
-          eL: [19, 12], hL: [15, 16], eR: [29, 12], hR: [33, 16],
-        }),
-      },
-      // drift sideways a touch
-      {
-        t: 60,
-        pose: pose({
-          head: [25, 4.5], neck: [25, 9.5], hip: [25, 20],
-          kL: [22, 24.5], fL: [22, 33.5], kR: [28, 24.5], fR: [28, 33.5],
-          eL: [20, 12], hL: [16, 16], eR: [30, 12], hR: [34, 16],
-        }),
-      },
-      // settle back down
-      {
-        t: 78,
-        pose: pose({
-          head: [24, 7], neck: [24, 12], hip: [24, 22.5],
-          kL: [21, 27], fL: [21, 37], kR: [27, 27], fR: [27, 37],
-          eL: [20, 17], hL: [16, 22], eR: [28, 17], hR: [32, 22],
-        }),
-      },
-      { t: 96, pose: pose() },
+      // rising and turning — passing through sideways at full height
+      { t: 42, pose: spinAt(90, -8) },
+      // apex — inverted, hanging in the sky
+      { t: 66, pose: spinAt(180, -8) },
+      // serene bob at the top
+      { t: 84, pose: spinAt(180, -6.5) },
+      // descending, completing the turn
+      { t: 108, pose: spinAt(270, -3) },
+      // back on his toes, facing front — like nothing happened
+      { t: 126, pose: pose() },
     ],
   },
 };

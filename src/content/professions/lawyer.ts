@@ -94,7 +94,7 @@ const gavel: Action = {
   id: 'gavel',
   name: 'Slam the Gavel',
   room: 'living',
-  effort: 5,
+  effort: 3,
   anim: {
     dur: 50,
     loop: false,
@@ -227,6 +227,7 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const lawyer: Profession = {
   id: 'lawyer',
   name: 'Lawyer',
+  gender: 'lady',
   maxStamina: 120,
   presentation,
   actions: [objection, gavel, brief, shower, bath, meditation],

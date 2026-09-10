@@ -36,7 +36,7 @@ try {
   const home = new Cube('home', professions.stickman);
   const friend = new Cube('friend', professions.dancer);
   const sticko = new Cubeman({
-    name: 'Sticko', profession: home.prof, home, shelf,
+    name: 'Sam', profession: home.prof, home, shelf,
     onVisitArrived: () => {},
   });
   cubemen.push(sticko);

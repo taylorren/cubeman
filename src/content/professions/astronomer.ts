@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -211,6 +211,7 @@ const meteorSighting: Action = {
 const rocketLaunch: Action = {
   id: 'rocket-launch',
   name: 'Rocket Launch',
+  room: 'living',
   effort: 6,
   secret: true,
   unlock: 'lift-off',
@@ -373,7 +374,8 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const astronomer: Profession = {
   id: 'astronomer',
   name: 'Astronomer',
-  actions: [stargazing, constellationTrace, meteorSighting, rocketLaunch, shower, bath],
+  maxStamina: 150,
+  actions: [stargazing, constellationTrace, meteorSighting, rocketLaunch, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

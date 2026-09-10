@@ -108,6 +108,10 @@ export interface Profession {
    *  Drawn on top of the skeleton in the body-scale transform after the pose
    *  is drawn, so it inherits every animation. Omit for the neutral stickman. */
   presentation?: BodyOverlay;
-  /** Rooms of this cubeman's home cube; the first is the hub/entry room. */
+  /**
+   * Optional stamina ceiling. When omitted, defaults to the global STAMINA.MAX
+   * (100). Useful for giving some characters a larger energy budget.
+   */
+  maxStamina?: number;
   scenes: Scene[];
 }

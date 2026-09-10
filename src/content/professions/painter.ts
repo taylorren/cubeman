@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -269,7 +269,8 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const painter: Profession = {
   id: 'painter',
   name: 'Painter',
-  actions: [easelPainting, splatter, brushFlourish, shower, bath],
+  maxStamina: 150,
+  actions: [easelPainting, splatter, brushFlourish, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

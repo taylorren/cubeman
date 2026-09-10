@@ -40,7 +40,13 @@ export const STAMINA = {
 export const GRACE_MS = 10_000;
 
 export class Stamina {
-  private value: number = STAMINA.MAX;
+  private readonly max: number;
+  private value: number;
+
+  constructor(max: number = STAMINA.MAX) {
+    this.max = max;
+    this.value = max;
+  }
 
   get(): number {
     return this.value;
@@ -53,6 +59,6 @@ export class Stamina {
 
   /** Recover energy (sleep only), clamped at MAX. */
   regen(n: number): void {
-    this.value = Math.min(STAMINA.MAX, this.value + n);
+    this.value = Math.min(this.max, this.value + n);
   }
 }

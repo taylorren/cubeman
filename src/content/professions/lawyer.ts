@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, BodyOverlay, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
 
 // --- Body presentation: a woman (the second one — tailored, not soft) ----------
 //
@@ -227,8 +227,9 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const lawyer: Profession = {
   id: 'lawyer',
   name: 'Lawyer',
+  maxStamina: 120,
   presentation,
-  actions: [objection, gavel, brief, shower, bath],
+  actions: [objection, gavel, brief, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

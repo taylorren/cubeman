@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, idle, sleep, shower, bath } from './shared';
+import { makeLivingRoom, bedroom, bathroom, idle, sleep, shower, bath, meditation } from './shared';
 
 // --- Musician: expressive, rhythmic, lives for the jam ------------------------
 // Personality: a little showy, head always bobbing to a beat only they hear.
@@ -219,7 +219,8 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const musician: Profession = {
   id: 'musician',
   name: 'Musician',
-  actions: [symphony5, airGuitar, symphony9, shower, bath],
+  maxStamina: 150,
+  actions: [symphony5, airGuitar, symphony9, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom], // first = hub/entry room

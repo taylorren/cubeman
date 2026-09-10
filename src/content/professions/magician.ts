@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -272,7 +272,8 @@ const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
 export const magician: Profession = {
   id: 'magician',
   name: 'Magician',
-  actions: [wandWave, rabbitHat, levitate, shower, bath],
+  maxStamina: 150,
+  actions: [wandWave, rabbitHat, levitate, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

@@ -84,7 +84,7 @@ export class Cubeman {
   /** Current horizontal offset in author space (48-wide). */
   private x = 0;
 
-  private readonly stamina = new Stamina();
+  private readonly stamina: Stamina;
   private lastInteract = performance.now();
   private graceUntil = 0;
   private sleepStartAt = 0;
@@ -106,6 +106,7 @@ export class Cubeman {
     this.shelf = opts.shelf;
     this.onAction = opts.onAction;
     this.onVisitArrived = opts.onVisitArrived;
+    this.stamina = new Stamina(this.prof.maxStamina);
     this.mode = { anim: this.prof.idle, loop: true };
     this.nextSpontaneous = performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS);
     this.nextWander = performance.now() + randRange(WANDER_MIN_MS, WANDER_MAX_MS);

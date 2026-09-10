@@ -204,6 +204,88 @@ export const bedroom: Scene = {
 };
 
 /**
+ * Meditation — seated cross-legged on the bed, hands resting, a calm
+ * breathing cycle. Reaches toward the quiet of the bedroom and settles
+ * the mind. A gentle restorative action: stamina recovers while meditating.
+ */
+export const meditation: Action = {
+  id: 'meditation',
+  name: 'Meditation',
+  room: 'bedroom',
+  effort: 2,
+  /** A quiet sit recovers gently — more than standing, between shower and bath. */
+  regen: 6 / 30,
+  stand: 36,
+  anim: {
+    dur: 90,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // settle onto the bed, legs crossing
+      {
+        t: 8,
+        pose: pose({
+          head: [24, 10], neck: [24, 15], hip: [24, 28],
+          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
+          eL: [19, 20], hL: [16, 25], eR: [29, 20], hR: [32, 25],
+        }),
+      },
+      // hands rest on knees, breathe in
+      {
+        t: 20,
+        pose: pose({
+          head: [24, 9], neck: [24, 14], hip: [24, 28],
+          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
+          eL: [21, 22], hL: [19, 27], eR: [27, 22], hR: [30, 27],
+        }),
+      },
+      // breathing out — shoulders settle
+      {
+        t: 35,
+        pose: pose({
+          head: [24, 9.5], neck: [24, 14.5], hip: [24, 28.5],
+          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
+          eL: [20, 21], hL: [18, 26], eR: [28, 21], hR: [31, 26],
+        }),
+      },
+      // deep breath — head lifts slightly, arms open a touch
+      {
+        t: 50,
+        pose: pose({
+          head: [24, 8.5], neck: [24, 13.5], hip: [24, 28],
+          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
+          eL: [22, 21], hL: [20, 26], eR: [26, 21], hR: [29, 26],
+        }),
+      },
+      // settle back to calm
+      {
+        t: 65,
+        pose: pose({
+          head: [24, 9.5], neck: [24, 14.5], hip: [24, 28.5],
+          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
+          eL: [20, 21], hL: [18, 26], eR: [28, 21], hR: [31, 26],
+        }),
+      },
+      // a moment of stillness, then return to standing
+      { t: 80, pose: pose() },
+      { t: 90, pose: pose() },
+    ],
+  },
+  /** Subtle front overlay: a soft glow above the cubeman while meditating. */
+  front(ctx, frame) {
+    const cycle = frame % 60;
+    const intensity = Math.sin((cycle / 60) * Math.PI * 2) * 0.5 + 0.5;
+    // gentle pulsing circle of light above the head
+    const cx = 24, cy = 14;
+    const r = Math.round(4 + intensity * 3);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = intensity * 0.15;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
+  },
+};
+
+/**
  * "Bathroom" — a bathtub with rising bubbles, a towel rack and a bath mat.
  * Bathing behavior itself arrives later; for now it's a room to visit.
  */

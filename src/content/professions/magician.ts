@@ -1,4 +1,4 @@
-import { pose, rot, shiftY } from '../../render/skeleton';
+import { pose, rot, shiftX, shiftY } from '../../render/skeleton';
 import type { Skeleton } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
 import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
@@ -211,11 +211,104 @@ const levitate: Action = {
 };
 
 /**
- * The Magician's living room: a small stage. Velvet curtains frame the
- * sides, a table with a top hat stands on the right, playing cards float
- * in the air, and a full moon watches from the window. Same arrangement as
- * every profession's hub.
+ * Smoke & Mirrors — the showman's vanishing trick. A flourish of the arms,
+ * a dense puff of smoke swallows him whole, and when it clears he is
+ * standing a step to the side as if nothing happened. No flying, no glow —
+ * just misdirection. Effort 5: the hardest of his living-room
+ * three, keeping the ascending slot rule (Wand Wave 3 → Rabbit Hat 4 → this).
  */
+const smokeMirrors: Action = {
+  id: 'smoke-mirrors',
+  name: 'Smoke & Mirrors',
+  room: 'living',
+  effort: 5,
+  anim: {
+    dur: 84,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // showman's flourish — both arms sweep up and across
+      {
+        t: 10,
+        pose: pose({
+          head: [24, 8.5], neck: [24, 13.5],
+          eL: [19, 12], hL: [15, 8],
+          eR: [29, 12], hR: [33, 8],
+        }),
+      },
+      // crouch — the puff begins to erupt around him
+      {
+        t: 20,
+        pose: pose({
+          head: [24, 9.5], neck: [24, 14.5], hip: [24, 24],
+          kL: [20, 27], fL: [19, 36], kR: [28, 27], fR: [29, 36],
+          eL: [20, 18], hL: [17, 22], eR: [28, 18], hR: [31, 22],
+        }),
+      },
+      // smoke swallows him — mid-vanish, shape blurring sideways
+      { t: 30, pose: shiftX(pose({ kL: [20, 36], fL: [19, 39], kR: [28, 36], fR: [29, 39] }), 3) },
+      // fully hidden by the cloud — teleport happens here
+      { t: 40, pose: shiftX(pose(), 7) },
+      // reappearing on the far side, still crouched in the thinning smoke
+      {
+        t: 52,
+        pose: shiftX(pose({
+          head: [24, 9.5], neck: [24, 14.5], hip: [24, 24],
+          kL: [20, 27], fL: [19, 36], kR: [28, 27], fR: [29, 36],
+          eL: [20, 18], hL: [17, 22], eR: [28, 18], hR: [31, 22],
+        }), 7),
+      },
+      // rise into a ta-da! pose
+      {
+        t: 66,
+        pose: shiftX(pose({
+          head: [24, 8.5], neck: [24, 13.5],
+          eL: [19, 13], hL: [16, 9],
+          eR: [29, 13], hR: [32, 9],
+        }), 7),
+      },
+      { t: 84, pose: shiftX(pose(), 7) },
+    ],
+  },
+  /**
+   * The smoke itself: an expanding, churning cloud that swells from the
+   * caster's spot, hangs dense through the teleport, then thins away over
+   * the reveal. Drawn as clustered translucent blobs — cheap, but it reads.
+   */
+  front(ctx, frame) {
+    // cloud life-cycle: swell (0-20), dense (20-46), dissipate (46-78)
+    let grow = 0;      // 0..1 cloud size
+    let alpha = 0;     // cloud opacity
+    let spread = 0;    // blobs wander more as the cloud breaks up
+    if (frame < 20) {
+      grow = frame / 20;
+      alpha = grow;
+    } else if (frame < 46) {
+      grow = 1;
+      alpha = 1;
+    } else if (frame < 78) {
+      const k = (frame - 46) / 32;
+      grow = 1;
+      alpha = 1 - k;
+      spread = k * 4;
+    } else {
+      return;
+    }
+    const R = 4 + grow * 9;
+    // cloud center drifts with the teleport (x 24 → 31)
+    const cx = 24 + Math.min(1, Math.max(0, (frame - 30) / 14)) * 7;
+    const cy = 30 - grow * 6;
+    ctx.fillStyle = '#fff';
+    for (const [dx, dy, rr] of [[-5, 2, 0.7], [0, -3, 1], [5, 1, 0.8], [-1, 3, 0.9], [3, -1, 0.7], [-4, -2, 0.6]] as const) {
+      const wob = Math.sin(frame / 4 + dx) * (1 + spread);
+      const r = Math.max(1, Math.round(rr * R + wob * 0.5));
+      ctx.globalAlpha = alpha * (0.35 + rr * 0.2);
+      ctx.fillRect(Math.round(cx + dx * grow + wob), Math.round(cy + dy * grow), r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+  },
+};
+
 const livingRoom: Scene = makeLivingRoom((ctx, frame) => {
   // floor
   ctx.fillRect(0, 46, 48, 2);
@@ -266,7 +359,7 @@ export const magician: Profession = {
   id: 'magician',
   name: 'Magician',
   maxStamina: 150,
-  actions: [wandWave, rabbitHat, levitate, shower, bath, meditation],
+  actions: [wandWave, rabbitHat, smokeMirrors, levitate, shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

@@ -1,6 +1,6 @@
 import type { Action, Scene } from './types';
 import type { Anim } from '../../render/skeleton';
-import { pose } from '../../render/skeleton';
+import { pose, shiftY } from '../../render/skeleton';
 
 /**
  * Behaviors shared by ALL professions — every cubeman idles and sleeps
@@ -208,6 +208,26 @@ export const bedroom: Scene = {
  * breathing cycle. Reaches toward the quiet of the bedroom and settles
  * the mind. A gentle restorative action: stamina recovers while meditating.
  */
+/**
+ * Meditation — quiet and *grounded*: he settles cross-legged into a lotus,
+ * then the whole seated pose drifts a SHORT distance off the floor and just
+ * bobs gently — no spinning, no soaring. A soft halo pulses above his head
+ * and two star-sparkles orbit him ("Stargazer's Trance"). All the drama is
+ * reserved for Merlin's secret Levitate — this is the humble, shared one.
+ * Effort 2 (kept > 0 so tired-mode cheap-action weighting stays sane);
+ * regen makes it a rest.
+ */
+const lotusPose = pose({
+  head: [24, 10], neck: [24, 15], hip: [24, 30],
+  kL: [19, 31], fL: [23, 35],
+  kR: [29, 31], fR: [25, 35],
+  eL: [20, 20], hL: [18, 26],
+  eR: [28, 20], hR: [30, 26],
+});
+
+/** The lotus pose hovering `dy` off the floor (dy negative = up). */
+const lotusAt = (dy: number) => shiftY(lotusPose, dy);
+
 export const meditation: Action = {
   id: 'meditation',
   name: 'Meditation',
@@ -216,74 +236,48 @@ export const meditation: Action = {
    *  on its own while wandering (per the design rule). */
   spontaneousOnly: true,
   effort: 2,
-  /** A quiet sit recovers gently — more than standing, between shower and bath. */
+  /** A quiet float recovers gently — more than standing, between shower and bath. */
   regen: 6 / 30,
   stand: 36,
   anim: {
-    dur: 90,
+    dur: 150,
     loop: false,
     keys: [
       { t: 0, pose: pose() },
-      // settle onto the bed, legs crossing
-      {
-        t: 8,
-        pose: pose({
-          head: [24, 10], neck: [24, 15], hip: [24, 28],
-          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
-          eL: [19, 20], hL: [16, 25], eR: [29, 20], hR: [32, 25],
-        }),
-      },
-      // hands rest on knees, breathe in
-      {
-        t: 20,
-        pose: pose({
-          head: [24, 9], neck: [24, 14], hip: [24, 28],
-          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
-          eL: [21, 22], hL: [19, 27], eR: [27, 22], hR: [30, 27],
-        }),
-      },
-      // breathing out — shoulders settle
-      {
-        t: 35,
-        pose: pose({
-          head: [24, 9.5], neck: [24, 14.5], hip: [24, 28.5],
-          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
-          eL: [20, 21], hL: [18, 26], eR: [28, 21], hR: [31, 26],
-        }),
-      },
-      // deep breath — head lifts slightly, arms open a touch
-      {
-        t: 50,
-        pose: pose({
-          head: [24, 8.5], neck: [24, 13.5], hip: [24, 28],
-          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
-          eL: [22, 21], hL: [20, 26], eR: [26, 21], hR: [29, 26],
-        }),
-      },
-      // settle back to calm
-      {
-        t: 65,
-        pose: pose({
-          head: [24, 9.5], neck: [24, 14.5], hip: [24, 28.5],
-          kL: [20, 33], fL: [17, 40], kR: [28, 33], fR: [31, 40],
-          eL: [20, 21], hL: [18, 26], eR: [28, 21], hR: [31, 26],
-        }),
-      },
-      // a moment of stillness, then return to standing
-      { t: 80, pose: pose() },
-      { t: 90, pose: pose() },
+      // settle down cross-legged, eyes closed, hands resting on knees
+      { t: 16, pose: lotusAt(0) },
+      // drift up... ...and gently bob — no rotation, just quiet floating
+      { t: 55, pose: lotusAt(-2) },
+      { t: 85, pose: lotusAt(-3) },
+      { t: 115, pose: lotusAt(-1.5) },
+      // sink back to the floor
+      { t: 138, pose: lotusAt(-0.5) },
+      // unfold and stand
+      { t: 150, pose: pose() },
     ],
   },
-  /** Subtle front overlay: a soft glow above the cubeman while meditating. */
+  /** Soft halo pulsing above the head + two star-sparkles orbiting the body
+   *  on a slow elliptical track — the "stargazer" dressing. */
   front(ctx, frame) {
     const cycle = frame % 60;
     const intensity = Math.sin((cycle / 60) * Math.PI * 2) * 0.5 + 0.5;
-    // gentle pulsing circle of light above the head
-    const cx = 24, cy = 14;
-    const r = Math.round(4 + intensity * 3);
     ctx.fillStyle = '#fff';
-    ctx.globalAlpha = intensity * 0.15;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    // pulsing halo above the head
+    const r = Math.round(3 + intensity * 2);
+    ctx.globalAlpha = 0.12 + intensity * 0.12;
+    ctx.fillRect(24 - r, 8 - r, r * 2, r * 2);
+    // orbiting star-sparkles (1px plus-shapes, twinkling with orbit phase)
+    for (const phase of [0, Math.PI]) {
+      const a = (frame / 50) * Math.PI * 2 + phase;
+      const sx = Math.round(24 + Math.cos(a) * 9);
+      const sy = Math.round(22 + Math.sin(a) * 5);
+      ctx.globalAlpha = 0.5 + Math.sin(a) * 0.3;
+      ctx.fillRect(sx, sy, 1, 1);
+      ctx.fillRect(sx - 1, sy, 1, 1);
+      ctx.fillRect(sx + 1, sy, 1, 1);
+      ctx.fillRect(sx, sy - 1, 1, 1);
+      ctx.fillRect(sx, sy + 1, 1, 1);
+    }
     ctx.globalAlpha = 1;
   },
 };

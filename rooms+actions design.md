@@ -80,9 +80,9 @@ To summarize:
 | 4 | **Chester the Chef** | • 1: Chef's Kiss (2)<br>• 2: Taste Test (3)<br>• 3: Flambé (5) | • Meditation *(spontaneous only)*<br>• 1: Shave (2) *(gent)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
 | 5 | **Pablo the Painter** | • 1: Brush Flourish (3)<br>• 2: Easel Painting (4) `[stand:30]`<br>• 3: Splatter (5) | • Meditation *(spontaneous only)*<br>• 1: Shave (2) *(gent)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
 | 6 | **Appleby the Astronomer** | • 1: Constellation Trace (3)<br>• 2: Stargazing (4) `[stand:30]`<br>• 3: Meteor Sighting (5)<br>• 4: Rocket Launch (4) `[SECRET]` ★ | • Meditation *(spontaneous only)*<br>• 1: Shave (2) *(gent)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
-| 7 | **Merlin the Magician** | • 1: Wand Wave (3)<br>• 2: Rabbit Hat (4) `[stand:34]`<br>• 3: Smoke & Mirrors (5) *(new — proposed)*<br>• 4: Levitate (4) `[SECRET]` ★ *(rises high into the sky while rotating 90°/180° — ✅ implemented)* | • Meditation *(spontaneous only)*<br>• 1: Shave (2) *(gent)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
+| 7 | **Merlin the Magician** | • 1: Wand Wave (3)<br>• 2: Rabbit Hat (4) `[stand:34]`<br>• 3: Smoke & Mirrors (5) *(vanish in a smoke puff, reappear a step aside — ✅ implemented)*<br>• 4: Levitate (4) `[SECRET]` ★ *(rises high into the sky while rotating 90°/180° — ✅ implemented)* | • Meditation *(spontaneous only)*<br>• 1: Shave (2) *(gent)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
 | 8 | **Briar the Botanist** | • 1: Water the Beds (2)<br>• 2: Snip (3)<br>• 3: Sunrise (4)<br>• 4: Superbloom (5) `[SECRET]` | • Meditation *(spontaneous only)*<br>• 1: Hair Combing (2) *(lady)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
-| 9 | **Laura the Lawyer** | • 1: Gavel (3)<br>• 2: Present the Brief (3)<br>• 3: Objection! (4) | • Meditation *(spontaneous only)*<br>• 1: Hair Combing (2) *(lady)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
+| 9 | **Laura the Lawyer** | • 1: Gavel (2)<br>• 2: Present the Brief (3)<br>• 3: Objection! (4) | • Meditation *(spontaneous only)*<br>• 1: Hair Combing (2) *(lady)*<br>• 2: Getting Dressed (3) *(gent: shirt, lady: blouse)*<br>• 3: ? *(reserved)* | • Shower<br>• Bath<br>• Meditation *(spontaneous only)* |
 
 **Room-agnostic actions:**
 
@@ -90,15 +90,15 @@ To summarize:
   the **Bed Room and Bath Room only**, and **only spontaneously** (wandering
   mode). It is **never** a button-assigned action and **never** a Living Room
   action. Every profession has it.
-  - **Designed visual — "Stargazer's Trance":** the cubeman rises a short
-    distance off the ground, slowly rotates with a gentle bob, a soft pulsing
-    halo around the head and tiny star-sparkles orbiting him, then settles back
-    down. Dreamlike/celestial — deliberately distinct from the Magician's
-    Levitate (no dramatic vertical rise, no wind lines). One shared animation
-    + one star/halo overlay for all 9 professions. Effort 0 (recovery action).
+  - **Designed visual — "Stargazer's Trance":** he settles **cross-legged into a
+    lotus**, then the seated pose drifts a short distance off the ground and
+    **bobs gently — no rotation**. A soft pulsing halo above the head and tiny
+    star-sparkles orbiting him. Dreamlike but humble. One shared animation
+    + one star/halo overlay for all 9 professions. Effort 2 (low; recovery
+    action — 0 would break the tired-mode cheap-action weighting).
+    **Rotation is Levitate's signature — Meditation never spins.**
     (Levitate itself stays a Magician-EXCLUSIVE secret: he rises high into
-    the sky while rotating 90°/180° — the redesign keeps it visually distinct
-    from the shared Meditation.)
+    the sky while rotating 90°/180° — the two must never be confused.)
 - **Sam (Sportsman):** Backflip, Cartwheel, Cheeky Wave — no room restriction
 - **Dorian (Dancer):** Pirouette, Moonwalk, Jazz Hands — no room restriction
 - **Bathroom** (Shower, Bath) — available to all professions

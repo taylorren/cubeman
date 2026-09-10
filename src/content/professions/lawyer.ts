@@ -94,7 +94,7 @@ const gavel: Action = {
   id: 'gavel',
   name: 'Slam the Gavel',
   room: 'living',
-  effort: 3,
+  effort: 2,
   anim: {
     dur: 50,
     loop: false,

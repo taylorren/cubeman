@@ -9,6 +9,12 @@ const PERSISTED_EVENTS = new Set([
   'sleep.enter',
   'sleep.start',
   'wake.start',
+  // action life-cycle: who performed what, when, and where — the main
+  // signal for "is everyone performing as many actions as they should?"
+  'action.start',
+  // dropped/room-blocked attempts — explains the actions that DIDN'T happen
+  'input.ignored',
+  'action.rejected',
 ]);
 const events: string[] = [];
 let enabled = false;

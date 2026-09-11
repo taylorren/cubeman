@@ -201,7 +201,11 @@ export class Cubeman {
    *  just rarer. */
   private pickAction(pool: Action[]): Action | undefined {
     // only offer actions usable in the current room (room-locked actions
-    // like shower/bath are hidden until the cubeman is in the bathroom)
+    // like shower/bath are hidden until the cubeman is in the bathroom).
+    // SECRET actions DO belong here: a spontaneous hint of the secret is
+    // what sparks the user's curiosity (simple button presses never fire
+    // them — buttons use actionsInCurrentRoom(), which excludes secrets).
+    // spontaneousOnly actions like Meditation belong here too.
     const usable = pool.filter((a) => Cubeman.roomOk(a, this.currentRoom));
     if (usable.length === 0) return undefined;
     const tired = this.stamina.get() < STAMINA.TIRED;

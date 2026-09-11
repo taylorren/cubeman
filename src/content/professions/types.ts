@@ -76,9 +76,11 @@ export interface Action {
   /** Synthesized sound to play when this action starts (default none). Sparse
    *  by design — only the Musician's actions produce sound. */
   sound?: SoundId;
-  /** SECRET actions are excluded from the Surprise pool and from spontaneous
-   *  play — they only fire via a hidden input combo. Used as profession
-   *  unlock easter eggs. */
+  /** SECRET actions are excluded from the Surprise pool — simple button
+   *  presses (slots or star) never fire them. They reach the user two ways:
+   *  a hidden input combo (the unlock), and RARE spontaneous play while
+   *  wandering — a glimpse of the secret that sparks curiosity about what
+   *  else is hidden. Used as profession unlock easter eggs. */
   secret?: boolean;
   /** SPONTANEOUS-ONLY actions (e.g. Meditation) never enter the button or
    *  Surprise pools — they only play in autonomous wandering mode. */

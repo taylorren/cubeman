@@ -16,7 +16,7 @@ An action is something a cubeman does, when:
 
 - For some professions, there may be "SECREET" actions associated. But the secret action for these professions can only be 1. 
 
-- SECRET actions are always triggered by button press combination and unlocks something else (achievement, new profession, etc)
+- SECRET actions are always triggered by button press combination and unlocks something else (achievement, new profession, etc). They are NEVER triggered by a simple button press — but they MAY play spontaneously while wandering: a rare glimpse of the secret is the curiosity hook that tells the user there is something hidden to discover.
 
 
 

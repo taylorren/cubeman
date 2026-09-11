@@ -324,22 +324,14 @@ function toyFor(cube: Cube): Toy {
     button.type = 'button';
     button.className = 'btn' + (isRandom ? ' btn-star' : '');
     button.value = entry.spec;
-    // Slot buttons resolve dynamically per room (cheapest-first), so the
-    // label reflects whatever the button WILL do right now; refreshed on click.
-    const label = () => {
-      if (isRandom) return 'Surprise (one of all actions)';
-      const slots = cubeman
-        .actionsInCurrentRoom()
-        .sort((a, b) => (a.effort ?? 8) - (b.effort ?? 8));
-      return slots[Number(entry.spec)]?.name ?? '—';
-    };
-    button.setAttribute('aria-label', `${cubeman.name}: ${label()}`);
-    button.title = label();
+    // Slot buttons resolve dynamically per room (cheapest-first) at CLICK
+    // time — the buttons themselves carry no hints. They are mystery
+    // controls by design (like the original toy), so no title tooltips and
+    // only a static, room-agnostic accessible name.
+    button.setAttribute('aria-label', `${cubeman.name}: ${isRandom ? 'Surprise' : 'slot button'}`);
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       selectCube(cube);
-      button.title = label();
-      button.setAttribute('aria-label', `${cubeman.name}: ${label()}`);
       if (secret) {
         const combo = secret.combo ?? ['0', '1', 'random'];
         const window = secret.comboWindow ?? 1500;

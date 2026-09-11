@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, BodyOverlay, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Body presentation: a woman -------------------------------------------------
 //
@@ -380,7 +380,7 @@ export const botanist: Profession = {
   gender: 'lady',
   maxStamina: 120,
   presentation,
-  actions: [water, snip, sunrise, superbloom, shower, bath, meditation],
+  actions: [water, snip, sunrise, superbloom, ...bedroomActions('lady'), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

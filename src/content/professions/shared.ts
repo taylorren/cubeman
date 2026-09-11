@@ -188,6 +188,12 @@ export const bedroom: Scene = {
     // photo frame on the wall — a tiny portrait of... a stickman
     portrait(ctx, 17, 6);
 
+    // wall mirror (left of the portrait) — the grooming spot. Hung low enough
+    // that the standing figure's head lines up with the glass.
+    rectOutline(ctx, 9, 12, 7, 8);
+    ctx.fillRect(11, 13, 1, 1); // shine
+    ctx.fillRect(10, 14, 1, 1);
+
     // floor lamp (left): shade pulses like a dimmer
     const glow = Math.floor(frame / 45) % 2;
     ctx.fillRect(6, 44, 5, 2); // base
@@ -281,6 +287,204 @@ export const meditation: Action = {
     ctx.globalAlpha = 1;
   },
 };
+
+// --- Bed Room: grooming + getting dressed (slot 1 & 2, lady/gent) -----------
+//
+// The bedroom's button-assigned pair, shared by every profession with a
+// lady/gent variant each (ascending-effort rule: grooming 2, dressing 3).
+// Grooming happens AT the wall mirror (the cubeman snaps to `stand`);
+// dressing happens center-stage so the garment overlay lines up with the
+// body (front overlays are anchored to a cubeman at screen x 24).
+
+/** Body-center stand spot in front of the bedroom wall mirror. */
+const MIRROR_CX = 12;
+
+/** The x where a dressing overlay expects the cubeman's body center. */
+const DRESS_CX = 24;
+
+/** Gentle razor strokes at the mirror: one arm raises to the jaw, tilts the
+ *  head this way and that, and strokes three times. A razor rides the hand. */
+const shave: Action = {
+  id: 'shave',
+  name: 'Shave',
+  room: 'bedroom',
+  effort: 2,
+  stand: MIRROR_CX,
+  anim: {
+    dur: 44,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // chin up, arm to the jaw
+      {
+        t: 6,
+        pose: pose({
+          head: [24.5, 8.8], neck: [24.5, 13.8],
+          eR: [28, 14], hR: [25.5, 10.5],
+        }),
+      },
+      // stroke 1: jaw downward
+      { t: 12, pose: pose({ head: [24.5, 8.8], neck: [24.5, 13.8], eR: [28, 14], hR: [26.5, 11.5] }) },
+      // stroke 2: back up the cheek
+      { t: 18, pose: pose({ head: [24.5, 8.8], neck: [24.5, 13.8], eR: [28, 14], hR: [25, 10] }) },
+      // stroke 3: along the jaw the other way, head tips left
+      { t: 24, pose: pose({ head: [23.5, 8.8], neck: [23.5, 13.8], eR: [27, 14], hR: [24.5, 11] }) },
+      { t: 30, pose: pose({ head: [23.5, 8.8], neck: [23.5, 13.8], eR: [27, 14], hR: [24, 10] }) },
+      // pat the cheek, then lower
+      { t: 36, pose: pose({ head: [24, 9.2], neck: [24, 14.2], eR: [28, 16], hR: [27, 13] }) },
+      { t: 44, pose: pose() },
+    ],
+  },
+  front: (ctx, frame) => {
+    if (frame < 6 || frame > 36) return;
+    // a razor stroking near the jaw (cubeman snapped to MIRROR_CX: the head
+    // sits at screen x≈15.4, so the hand zone is x 15–19, y 22–26).
+    const phase = Math.floor((frame - 6) / 6) % 2;
+    const y = 24 + phase; // strokes ride up/down with the hand
+    ctx.fillRect(16, y, 3, 1);   // blade
+    ctx.fillRect(18, y + 1, 1, 2); // handle
+  },
+};
+/** Lady grooming at the mirror: both hands rise to the crown and sweep a
+ *  comb through the hair, left then right. A comb rides between the hands. */
+const hairCombing: Action = {
+  id: 'hair-combing',
+  name: 'Hair Combing',
+  room: 'bedroom',
+  effort: 2,
+  stand: MIRROR_CX,
+  anim: {
+    dur: 44,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // both hands up to the crown
+      {
+        t: 6,
+        pose: pose({
+          head: [24, 8.8], neck: [24, 13.8],
+          eL: [19, 12], hL: [22, 9],
+          eR: [29, 12], hR: [26, 9],
+        }),
+      },
+      // sweep left→right
+      { t: 12, pose: pose({ head: [24, 8.8], neck: [24, 13.8], eL: [19, 12], hL: [21, 8.5], eR: [29, 12], hR: [27, 8.5] }) },
+      // sweep right→left
+      { t: 18, pose: pose({ head: [24, 8.8], neck: [24, 13.8], eL: [19, 12], hL: [23, 9], eR: [29, 12], hR: [25, 9] }) },
+      // a second, smoother pass
+      { t: 24, pose: pose({ head: [24, 8.8], neck: [24, 13.8], eL: [19, 12], hL: [21.5, 8.5], eR: [29, 12], hR: [26.5, 8.5] }) },
+      { t: 30, pose: pose({ head: [24, 8.8], neck: [24, 13.8], eL: [19, 12], hL: [22, 9], eR: [29, 12], hR: [26, 9] }) },
+      // smooth the sides, then lower
+      { t: 36, pose: pose({ head: [24, 9], neck: [24, 14], eL: [19, 14], hL: [20, 11], eR: [29, 14], hR: [28, 11] }) },
+      { t: 44, pose: pose() },
+    ],
+  },
+  front: (ctx, frame) => {
+    if (frame < 6 || frame > 36) return;
+    // a comb gliding across the crown (head screen y≈23 at MIRROR_CX)
+    const phase = Math.floor((frame - 6) / 6) % 2;
+    const x = 14 + phase; // the comb shifts with the sweep
+    ctx.fillRect(x, 21, 4, 1);       // spine
+    ctx.fillRect(x + 1, 22, 1, 1);   // teeth
+    ctx.fillRect(x + 3, 22, 1, 1);
+  },
+};
+/** Donning a shirt (gent): both arms shoot up through the sleeves, tug each
+ *  shoulder straight, then smooth the front. The shirt fills in via overlay. */
+const putOnShirt: Action = {
+  id: 'put-on-shirt',
+  name: 'Getting Dressed',
+  room: 'bedroom',
+  effort: 3,
+  stand: DRESS_CX,
+  anim: {
+    dur: 56,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      // arms up through the sleeves
+      { t: 8, pose: pose({ eL: [19, 10], hL: [17, 5], eR: [29, 10], hR: [31, 5] }) },
+      // tug the left shoulder straight
+      { t: 16, pose: pose({ head: [23.5, 8.8], neck: [23.5, 13.8], eL: [18, 10], hL: [16, 6], eR: [29, 10], hR: [31, 5] }) },
+      // both arms up again, shake it down
+      { t: 24, pose: pose({ eL: [19, 10], hL: [17, 5], eR: [29, 10], hR: [31, 5] }) },
+      // tug the right shoulder straight
+      { t: 32, pose: pose({ head: [24.5, 8.8], neck: [24.5, 13.8], eL: [19, 10], hL: [17, 5], eR: [30, 10], hR: [32, 6] }) },
+      // settle, hands smoothing the front
+      { t: 42, pose: pose({ eL: [20, 18], hL: [18, 24], eR: [28, 18], hR: [30, 24] }) },
+      // one last pat at the hips
+      { t: 48, pose: pose({ eL: [20, 20], hL: [17, 26], eR: [28, 20], hR: [31, 26] }) },
+      { t: 56, pose: pose() },
+    ],
+  },
+  front: (ctx, frame) => {
+    // the shirt fills in as it's tugged on, then stays on while smoothing
+    if (frame < 16 || frame > 52) return;
+    const on = frame >= 42;
+    // torso: neck screen y≈27, hip y≈34.5 (cubeman snapped to DRESS_CX)
+    ctx.fillRect(22, 27, 4, 9); // body of the shirt
+    if (on) {
+      ctx.fillRect(21, 28, 1, 4); // left sleeve
+      ctx.fillRect(26, 28, 1, 4); // right sleeve
+      ctx.fillRect(22, 36, 4, 1); // hem
+    } else {
+      // half-on: only one sleeve sits while a shoulder is being tugged
+      const left = frame < 24;
+      ctx.fillRect(left ? 21 : 26, 28, 1, 4);
+    }
+  },
+};
+
+/** Donning a blouse (lady): the same dressing skeleton, but the garment
+ *  reads softer — sleeves, a gentle flare at the hem and a tiny collar bow. */
+const putOnBlouse: Action = {
+  id: 'put-on-blouse',
+  name: 'Getting Dressed',
+  room: 'bedroom',
+  effort: 3,
+  stand: DRESS_CX,
+  anim: {
+    dur: 56,
+    loop: false,
+    keys: [
+      { t: 0, pose: pose() },
+      { t: 8, pose: pose({ eL: [19, 10], hL: [17, 5], eR: [29, 10], hR: [31, 5] }) },
+      { t: 16, pose: pose({ head: [23.5, 8.8], neck: [23.5, 13.8], eL: [18, 10], hL: [16, 6], eR: [29, 10], hR: [31, 5] }) },
+      { t: 24, pose: pose({ eL: [19, 10], hL: [17, 5], eR: [29, 10], hR: [31, 5] }) },
+      { t: 32, pose: pose({ head: [24.5, 8.8], neck: [24.5, 13.8], eL: [19, 10], hL: [17, 5], eR: [30, 10], hR: [32, 6] }) },
+      { t: 42, pose: pose({ eL: [20, 18], hL: [18, 24], eR: [28, 18], hR: [30, 24] }) },
+      { t: 48, pose: pose({ eL: [20, 20], hL: [17, 26], eR: [28, 20], hR: [31, 26] }) },
+      { t: 56, pose: pose() },
+    ],
+  },
+  front: (ctx, frame) => {
+    if (frame < 16 || frame > 52) return;
+    const on = frame >= 42;
+    ctx.fillRect(22, 27, 4, 8);      // body of the blouse (a touch shorter)
+    if (on) {
+      ctx.fillRect(21, 28, 1, 4);    // left sleeve
+      ctx.fillRect(26, 28, 1, 4);    // right sleeve
+      ctx.fillRect(21, 35, 6, 1);    // flared hem
+      ctx.fillRect(23, 27, 2, 1);    // bow at the collar
+    } else {
+      const left = frame < 24;
+      ctx.fillRect(left ? 21 : 26, 28, 1, 4);
+    }
+  },
+};
+
+/**
+ * The bedroom's button-assigned actions for a profession's body variant
+ * (cheapest-first ascending effort, per the design's slot ordering):
+ * slot 1 grooming (Shave / Hair Combing), slot 2 Getting Dressed
+ * (shirt / blouse).
+ */
+export function bedroomActions(gender?: 'lady' | 'gent'): Action[] {
+  return gender === 'lady' ? [hairCombing, putOnBlouse] : [shave, putOnShirt];
+}
+
+
+
 
 /**
  * "Bathroom" — a bathtub with rising bubbles, a towel rack and a bath mat.

@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -148,7 +148,7 @@ export const chef: Profession = {
   id: 'chef',
   name: 'Chef',
   maxStamina: 150,
-  actions: [flambe, tasteTest, chefsKiss, shower, bath, meditation],
+  actions: [flambe, tasteTest, chefsKiss, ...bedroomActions(), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

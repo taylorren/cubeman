@@ -1,6 +1,6 @@
 import { pose, rot } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Dancer: graceful, expressive, full of rhythm --------------------------
 // Personality: fluid movements, spins, and dramatic poses. The dancer
@@ -201,7 +201,7 @@ export const dancer: Profession = {
   id: 'dancer',
   name: 'Dancer',
   maxStamina: 150,
-  actions: [pirouette, moonwalk, jazzHands, shower, bath, meditation],
+  actions: [pirouette, moonwalk, jazzHands, ...bedroomActions(), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom], // first = hub/entry room

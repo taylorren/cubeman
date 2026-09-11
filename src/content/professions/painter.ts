@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -270,7 +270,7 @@ export const painter: Profession = {
   id: 'painter',
   name: 'Painter',
   maxStamina: 150,
-  actions: [easelPainting, splatter, brushFlourish, shower, bath, meditation],
+  actions: [easelPainting, splatter, brushFlourish, ...bedroomActions(), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

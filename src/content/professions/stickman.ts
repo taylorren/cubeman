@@ -1,6 +1,6 @@
 import { pose, rot } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Actions (3 for now — the array is the extension point) ----------------
 
@@ -176,7 +176,7 @@ export const stickman: Profession = {
   id: 'stickman',
   name: 'Sportsman',
   maxStamina: 150,
-  actions: [backflip, cartwheel, cheekyWave, shower, bath, meditation], // ← add new actions here to expand
+  actions: [backflip, cartwheel, cheekyWave, ...bedroomActions(), shower, bath, meditation], // ← add new actions here to expand
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom], // first = hub/entry room

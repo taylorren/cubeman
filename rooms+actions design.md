@@ -108,13 +108,18 @@ plus two button-assigned actions, common to all professions with a lady/gent
 variant each (following the same ascending-effort rule as the Living Room):
 
 - **Meditation (spontaneous only)** — all professions, per the 🔔 rule above
+  — ✅ implemented (shared lotus drift + halo/sparkles in `shared.ts`)
 - **1: Grooming (2)** — button-assigned. Gent: **Shave**; Lady: **Hair Combing**.
-  Short mirror action, few frames.
+  Short mirror action, few frames. — ✅ implemented (`shave` / `hairCombing`
+  in `shared.ts`; the shared bedroom scene gained a wall mirror at x9–16 and
+  grooming snaps to it via `stand`)
 - **2: Getting Dressed (3)** — button-assigned. Gent: putting on a **shirt**;
   Lady: putting on a **blouse**. One animation skeleton per variant; reuses the
   existing per-profession `presentation` body layer for the silhouette, so the
   animation authoring effort stays moderate (arm-raise + torso sweep, ~2x the
-  grooming action).
+  grooming action). — ✅ implemented (`putOnShirt` / `putOnBlouse` in
+  `shared.ts`; professions select their variant via the new `bedroomActions
+  (gender)` helper — lady for Briar & Laura, gent for everyone else)
 
 Animation-effort note: each bedroom action needs 2 authored variants
 (lady/gent), but the skeleton/timing is shared, so the real cost is 2 short

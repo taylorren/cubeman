@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, BodyOverlay, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Body presentation: a woman (the second one — tailored, not soft) ----------
 //
@@ -230,7 +230,7 @@ export const lawyer: Profession = {
   gender: 'lady',
   maxStamina: 120,
   presentation,
-  actions: [objection, gavel, brief, shower, bath, meditation],
+  actions: [objection, gavel, brief, ...bedroomActions('lady'), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

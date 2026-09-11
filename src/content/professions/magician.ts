@@ -1,7 +1,7 @@
 import { pose, rot, shiftX, shiftY } from '../../render/skeleton';
 import type { Skeleton } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -359,7 +359,7 @@ export const magician: Profession = {
   id: 'magician',
   name: 'Magician',
   maxStamina: 150,
-  actions: [wandWave, rabbitHat, smokeMirrors, levitate, shower, bath, meditation],
+  actions: [wandWave, rabbitHat, smokeMirrors, levitate, ...bedroomActions(), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

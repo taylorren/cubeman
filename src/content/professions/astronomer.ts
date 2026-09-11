@@ -1,6 +1,6 @@
 import { pose } from '../../render/skeleton';
 import type { Action, Profession, Scene } from './types';
-import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation } from './shared';
+import { makeLivingRoom, bedroom, bathroom, rectOutline, idle, sleep, shower, bath, meditation, bedroomActions } from './shared';
 
 // --- Actions ----------------------------------------------------------------
 
@@ -375,7 +375,7 @@ export const astronomer: Profession = {
   id: 'astronomer',
   name: 'Astronomer',
   maxStamina: 150,
-  actions: [stargazing, constellationTrace, meteorSighting, rocketLaunch, shower, bath, meditation],
+  actions: [stargazing, constellationTrace, meteorSighting, rocketLaunch, ...bedroomActions(), shower, bath, meditation],
   idle,
   sleep,
   scenes: [livingRoom, bedroom, bathroom],

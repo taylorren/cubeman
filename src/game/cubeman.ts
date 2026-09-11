@@ -191,7 +191,15 @@ export class Cubeman {
     const slowdown = this.stamina.get() < STAMINA.TIRED ? STAMINA.TIRED_SLOWDOWN : 1;
     this.nextSpontaneous =
       performance.now() + randRange(SPONTANEOUS_MIN_MS, SPONTANEOUS_MAX_MS) * slowdown;
-    this.log('action.start', { action: action.id, source: spontaneous ? 'autonomous' : 'input' });
+    // Only SECRET actions are logged: a rare spontaneous glimpse or a combo
+    // press is the signal worth persisting. Ordinary tricks happen dozens of
+    // times per minute across the shelf and would flood logs/cubeman-*.jsonl.
+    if (action.secret) {
+      this.log('secret.start', {
+        action: action.id,
+        source: spontaneous ? 'autonomous' : 'input',
+      });
+    }
     // progress (achievements) counts only actions the player explicitly
     // triggered — a cubeman's autonomous living shouldn't earn player goals.
     if (!spontaneous) this.onAction?.(action);
@@ -209,8 +217,13 @@ export class Cubeman {
     const usable = pool.filter((a) => Cubeman.roomOk(a, this.currentRoom));
     if (usable.length === 0) return undefined;
     const tired = this.stamina.get() < STAMINA.TIRED;
-    if (!tired) return usable[Math.floor(Math.random() * usable.length)]!;
-    const weights = usable.map((a) => 1 / (a.effort ?? 8));
+    // Tired cubemen favor cheaper tricks; secrets are always quarter-weight —
+    // a rare spontaneous glimpse to hint "something is hidden here", never a
+    // routine occurrence.
+    const weights = usable.map((a) => {
+      const base = tired ? 1 / (a.effort ?? 8) : 1;
+      return a.secret ? base * 0.25 : base;
+    });
     let r = Math.random() * weights.reduce((s, w) => s + w, 0);
     for (let i = 0; i < usable.length; i++) {
       r -= weights[i]!;

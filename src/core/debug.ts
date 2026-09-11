@@ -2,6 +2,9 @@ type LogValue = string | number | boolean | null | readonly LogValue[] | { [key:
 export type LogDetails = Record<string, LogValue>;
 
 const MAX_EVENTS = 500;
+/** Only the RARE, signal-worthy events are persisted to logs/cubeman-*.jsonl:
+ *  sleep/wake cycles, visits, and SECRET actions (autonomous hints + combo
+ *  presses). Ordinary tricks are far too frequent to be worth disk space. */
 const PERSISTED_EVENTS = new Set([
   'visit.started',
   'visit.closed',
@@ -9,12 +12,7 @@ const PERSISTED_EVENTS = new Set([
   'sleep.enter',
   'sleep.start',
   'wake.start',
-  // action life-cycle: who performed what, when, and where — the main
-  // signal for "is everyone performing as many actions as they should?"
-  'action.start',
-  // dropped/room-blocked attempts — explains the actions that DIDN'T happen
-  'input.ignored',
-  'action.rejected',
+  'secret.start',
 ]);
 const events: string[] = [];
 let enabled = false;

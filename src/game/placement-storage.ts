@@ -1,63 +1,54 @@
 const STORAGE_KEY_PREFIX = 'matchman.shelf.v1';
 
 /**
- * A stable identifier for this machine base. Different devices (or browser
- * profiles with different platform characteristics) each get their own id,
- * so the shelf layout is preserved per machine rather than shared.
+ * Storage keys are PLAIN (no machine scoping): localStorage is already
+ * per-browser-profile, so per-device separation comes for free. An earlier
+ * version scoped keys with a hash of userAgent/screen/timezone — any browser
+ * update or OS change silently "lost" the shelf. loadScoped() recovers data
+ * written by those old keys.
  */
-let cachedStorageKey: string | null = null;
+let cachedRecoveryDone = new Set<string>();
 
-function machineBase(): string {
-  if (cachedStorageKey !== null) return cachedStorageKey;
-  const components = [
-    navigator.userAgent,
-    String(screen.width),
-    String(screen.height),
-    Intl.DateTimeFormat().resolvedOptions().timeZone ?? '',
-  ];
-  // FNV-1a over the joined components — deterministic per machine base.
-  let hash = 0x811c9dc5;
-  for (const component of components) {
-    for (let i = 0; i < component.length; i++) {
-      hash ^= component.charCodeAt(i);
-      hash = Math.imul(hash, 0x01000193) >>> 0;
-    }
-  }
-  cachedStorageKey = hash.toString(16).padStart(8, '0');
-  return cachedStorageKey;
-}
-
-/** A per-machine-base storage key for the given feature prefix. */
-export function machineScopedKey(prefix: string): string {
-  return `${prefix}.${machineBase()}`;
-}
-
-function storageKey(): string {
-  const key = machineScopedKey(STORAGE_KEY_PREFIX);
-  // One-time migration: layouts saved before per-machine scoping move to
-  // the machine-scoped key so existing placements are preserved.
+/**
+ * Read `prefix` from localStorage; if empty, recover the best value from any
+ * stale machine-scoped key (`prefix.<8-hex>`) left by the old hashing scheme,
+ * migrate it to the plain key, and remove the stale keys. `better` picks
+ * between two candidate raw values (e.g. the one with the higher tier).
+ */
+export function loadScoped(
+  prefix: string,
+  better: (current: string | null, candidate: string) => string | null,
+): string | null {
   try {
-    const legacy = localStorage.getItem(STORAGE_KEY_PREFIX);
-    if (legacy !== null) {
-      localStorage.setItem(key, legacy);
-      localStorage.removeItem(STORAGE_KEY_PREFIX);
+    let raw = localStorage.getItem(prefix);
+    if (cachedRecoveryDone.has(prefix)) return raw;
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key === null) continue;
+      if (key !== prefix && key.startsWith(`${prefix}.`) &&
+          /^[0-9a-f]{8}$/.test(key.slice(prefix.length + 1))) {
+        stale.push(key);
+        const candidate = localStorage.getItem(key);
+        if (candidate !== null) raw = better(raw, candidate);
+      }
     }
+    if (raw !== null && raw !== localStorage.getItem(prefix)) {
+      localStorage.setItem(prefix, raw);
+    }
+    for (const key of stale) localStorage.removeItem(key);
+    cachedRecoveryDone.add(prefix);
+    return raw;
   } catch (error) {
-    console.warn('Could not migrate the saved shelf layout.', error);
+    console.warn('Shelf storage is unavailable.', error);
+    return null;
   }
-  return key;
 }
 
 type SavedLayout = { slots: Array<string | null>; warning: string | null };
 
 export function loadPlacement(availableIds: Set<string>, fallback: Array<string | null>): SavedLayout {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(storageKey());
-  } catch (error) {
-    console.warn('Shelf storage is unavailable.', error);
-    return { slots: [...fallback], warning: 'Shelf storage is unavailable; placement is session-only.' };
-  }
+  const raw = loadScoped(STORAGE_KEY_PREFIX, (current, candidate) => current ?? candidate);
   if (raw === null) return { slots: [...fallback], warning: null };
   let data: unknown;
   try {
@@ -94,7 +85,7 @@ export function loadPlacement(availableIds: Set<string>, fallback: Array<string 
 
 export function savePlacement(slots: ReadonlyArray<string | null>): string | null {
   try {
-    localStorage.setItem(storageKey(), JSON.stringify(slots));
+    localStorage.setItem(STORAGE_KEY_PREFIX, JSON.stringify(slots));
     return null;
   } catch (error) {
     console.warn('Could not save shelf placement.', error);
@@ -103,11 +94,16 @@ export function savePlacement(slots: ReadonlyArray<string | null>): string | nul
 }
 
 /** Wipe the persisted shelf layout (used by the debug reset command). Also
- *  removes the pre-machine-scoping legacy key. */
+ *  removes any stale machine-scoped copies. */
 export function clearPlacementStorage(): void {
   try {
-    localStorage.removeItem(storageKey());
     localStorage.removeItem(STORAGE_KEY_PREFIX);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key !== null && key.startsWith(`${STORAGE_KEY_PREFIX}.`)) {
+        localStorage.removeItem(key);
+      }
+    }
   } catch {
     // storage unavailable — nothing to wipe
   }

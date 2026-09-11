@@ -34,9 +34,9 @@ export const SHELF_TIERS: ShelfTier[] = [
   { tier: 4, open: 9, name: 'Glorious Gala', slots: [0, 1, 2, 3, 4, 5, 6, 7, 8] },
 ];
 
-import { machineScopedKey } from './placement-storage';
+import { loadScoped } from './placement-storage';
 
-const PROGRESS_KEY = machineScopedKey('matchman.progress.v1');
+const PROGRESS_KEY = 'matchman.progress.v1';
 
 interface SavedProgress {
   roomsReceivedVisitors: string[];
@@ -58,11 +58,28 @@ export class ShelfProgression {
     this.load();
   }
 
-  /** Restore persisted progression, silently ignoring corrupt data. */
+  /** Restore persisted progression, silently ignoring corrupt data. Also
+   *  recovers data written by the old machine-scoped keys (the hash of
+   *  userAgent/screen/timezone changed whenever the browser or OS changed,
+   *  which silently reset the shelf). */
   private load(): void {
+    const better = (current: string | null, candidate: string): string | null => {
+      const score = (raw: string): number => {
+        try {
+          const d = JSON.parse(raw) as Partial<SavedProgress>;
+          return (typeof d.currentTier === 'number' ? d.currentTier : 0) * 10000 +
+            (typeof d.totalVisits === 'number' ? d.totalVisits : 0);
+        } catch {
+          return -1;
+        }
+      };
+      const c = current === null ? -1 : score(current);
+      const n = score(candidate);
+      return n > c ? candidate : current;
+    };
+    const raw = loadScoped(PROGRESS_KEY, better);
+    if (raw === null) return;
     try {
-      const raw = localStorage.getItem(PROGRESS_KEY);
-      if (raw === null) return;
       const data = JSON.parse(raw) as Partial<SavedProgress>;
       if (Array.isArray(data.roomsReceivedVisitors)) {
         this.roomsReceivedVisitors = new Set(data.roomsReceivedVisitors.filter((id) => typeof id === 'string'));
@@ -201,6 +218,12 @@ export class ShelfProgression {
 export function clearShelfProgressionStorage(): void {
   try {
     localStorage.removeItem(PROGRESS_KEY);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key !== null && key.startsWith(`${PROGRESS_KEY}.`)) {
+        localStorage.removeItem(key);
+      }
+    }
   } catch {
     // storage unavailable — nothing to wipe
   }

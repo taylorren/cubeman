@@ -242,8 +242,9 @@ export const meditation: Action = {
    *  on its own while wandering (per the design rule). */
   spontaneousOnly: true,
   effort: 2,
-  /** A quiet float recovers gently — more than standing, between shower and bath. */
-  regen: 6 / 30,
+  /** A quiet float recovers gently — a small net rest (well below shower
+   *  and bath; sleep remains the main channel). */
+  regen: 1.5 / 30,
   stand: 36,
   anim: {
     dur: 150,
@@ -569,8 +570,10 @@ export const shower: Action = {
   effort: 4,
   room: 'bathroom',
   stand: 12,
-  /** Recover while under the running water — ~sleep's rate (4/s). */
-  regen: 4 / 30,
+  /** Recover while under the running water — a short, refreshing rinse:
+   *  roughly break-even (a shower barely out-earns its own effort), so the
+   *  bed stays the primary recovery channel. */
+  regen: 6 / 30,
   front: (ctx, frame) => {
     // Falling water from the spout (y≈10) down to his head/shoulders (~y26).
     // Droplets fall in a staggered cadence over the head's columns (x11–13);
@@ -687,8 +690,11 @@ export const bath: Action = {
   name: 'Bath',
   effort: 3,
   room: 'bathroom',
-  /** A soak is more restorative than a shower — recovers ~8/s while immersed. */
-  regen: 8 / 30,
+  /** A soak is more restorative than a shower — but only a PARTIAL refill
+   *  (~+12 net per soak vs a bed sleep's full recharge). Log analysis showed
+   *  the old 8/s fully recharged cubemen via bathing alone, starving the
+   *  sleep loop. */
+  regen: 3 / 30,
   stand: 35,
   front: (ctx, frame) => {
     // The tub's NEAR wall sinks the bather below the water line (only his head
